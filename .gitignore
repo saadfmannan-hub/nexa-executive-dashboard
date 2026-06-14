@@ -1,0 +1,8 @@
+__pycache__/
+*.py[cod]
+*.log
+*.pid
+backups/
+dar_al_sultan.db
+.env
+.DS_Store

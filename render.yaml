@@ -1,0 +1,22 @@
+services:
+  - type: web
+    name: dar-al-sultan-demo
+    runtime: python
+    plan: free
+    buildCommand: python -m compileall server.py
+    startCommand: python server.py
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: DAS_CLOUD_MODE
+        value: "1"
+      - key: DAS_DEMO_MODE
+        value: "1"
+      - key: DAS_DB_PATH
+        value: /tmp/dar_al_sultan_demo.db
+      - key: DAS_BACKUP_DIR
+        value: /tmp/dar_al_sultan_backups
+      - key: DAS_NO_BROWSER
+        value: "1"
+      - key: PYTHON_VERSION
+        value: 3.13.3

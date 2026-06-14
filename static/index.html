@@ -1,0 +1,841 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#101725" />
+  <title>Dar al Sultan — CFO & Production</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="favicon.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link rel="stylesheet" href="styles.css?v=3.4-luxury-3d" />
+</head>
+<body>
+  <div class="cloud-demo-banner" id="cloudDemoBanner">CLOUD DEMO · SAMPLE DATA · OWNER PRESENTATION VERSION</div>
+  <div class="login-screen" id="loginScreen">
+    <div class="login-visual">
+      <div class="pattern"></div>
+      <div class="login-brand">
+        <img class="brand-logo login-logo" src="dar-al-sultan-logo.png" alt="Dar al Sultan logo" />
+        <span class="eyebrow">DAR AL SULTAN</span>
+        <h1>Business Intelligence<br>& Production Control</h1>
+        <p>A secure cloud-ready CFO management system for finance, workshops, employees and multi-branch performance.</p>
+        <div class="feature-pills">
+          <span>Live Branch Access</span><span>Role Permissions</span><span>Audit Trail</span><span>Mobile Installable</span>
+        </div>
+      </div>
+    </div>
+    <div class="login-panel">
+      <form class="login-card" id="loginForm">
+        <span class="eyebrow">SECURE ACCESS</span>
+        <h2>Welcome back</h2>
+        <p>Sign in to the Dar al Sultan management application.</p>
+        <label>Username<input name="username" autocomplete="username" value="admin" required /></label>
+        <label>Password<input name="password" type="password" autocomplete="current-password" value="Admin@2026" required /></label>
+        <button class="primary-btn full" type="submit">Sign In</button>
+        <div class="login-error" id="loginError"></div>
+        <details class="demo-accounts">
+          <summary>Cloud demo accounts</summary>
+          <small><strong>Admin:</strong> admin / Admin@2026</small>
+          <small><strong>Owner:</strong> owner / Owner@2026</small>
+          <small><strong>Supervisor:</strong> supervisor / Production@2026</small>
+        </details>
+        <div class="login-credit">Made by <strong>Saad Fazal</strong></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="app-shell hidden" id="appShell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <img class="brand-logo sidebar-logo" src="dar-al-sultan-logo.png" alt="Dar al Sultan logo" />
+        <div><h1>Dar al Sultan</h1><p>CFO & Production</p></div>
+      </div>
+      <nav class="nav" id="navigation">
+        <button class="nav-item active" data-page="dashboard" data-permission="dashboard"><span>◫</span> Dashboard</button>
+        <button class="nav-item" data-page="alerts" data-permission="alert_read"><span>◉</span> Alerts & Control</button>
+        <button class="nav-item" data-page="orders" data-permission="orders_read"><span>◇</span> Orders</button>
+        <button class="nav-item" data-page="membership" data-permission="membership_read"><span>♢</span> Membership</button>
+        <button class="nav-item" data-page="production" data-permission="production_read"><span>⚙</span> Production</button>
+        <button class="nav-item" data-page="financials" data-permission="finance_read"><span>◈</span> Financials</button>
+        <button class="nav-item" data-page="posSales" data-permission="finance_read"><span>⇩</span> Sales Record</button>
+        <button class="nav-item" data-page="employees" data-permission="employees"><span>◎</span> Employees</button>
+        <button class="nav-item" data-page="payroll" data-permission="attendance_read"><span>▦</span> Payroll & Attendance</button>
+        <button class="nav-item" data-page="budget" data-permission="budget_read"><span>▥</span> Budgets & Control</button>
+        <button class="nav-item" data-page="reports" data-permission="reports"><span>▤</span> Reports</button>
+        <button class="nav-item" data-page="audit" data-permission="audit"><span>⌁</span> Audit Log</button>
+        <button class="nav-item" data-page="users" data-permission="users"><span>♙</span> Users & Roles</button>
+      </nav>
+      <div class="sidebar-footer">
+        <div class="secure-pill">● Cloud Demo Connected</div>
+        <small>Phase 3.4 · Luxury 3D Analytics</small>
+        <div class="creator-credit">Made by <strong>Saad Fazal</strong></div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <button class="menu-btn" id="menuBtn">☰</button>
+        <img class="topbar-logo" src="dar-al-sultan-logo.png" alt="" aria-hidden="true" />
+        <div><h2 id="pageTitle">Executive Dashboard</h2><p id="pageSubtitle">Company-wide financial and production overview</p></div>
+        <div class="top-actions">
+          <select id="globalBranch" class="control"><option value="All">All Branches</option></select>
+          <div class="notification-wrap">
+            <button class="notification-btn" id="notificationBtn" title="Management alerts"><span class="bell-icon">♢</span><span class="notification-count hidden" id="notificationCount">0</span></button>
+            <div class="notification-dropdown" id="notificationDropdown">
+              <div class="notification-dropdown-head"><div><strong>Management Alerts</strong><small id="notificationDropdownSummary">No unread alerts</small></div><button class="link-btn" id="markDropdownRead">Mark all read</button></div>
+              <div class="notification-mini-list" id="notificationMiniList"></div>
+              <button class="notification-view-all" id="viewAllNotifications">Open Alerts & Control Center</button>
+            </div>
+          </div>
+          <div class="user-menu-wrap">
+            <button class="user-chip" id="userMenuBtn">
+              <div class="avatar" id="userAvatar">SK</div>
+              <div><strong id="userFullName">Saad Khan</strong><small id="userRole">Administrator</small></div>
+              <span>⌄</span>
+            </button>
+            <div class="user-dropdown" id="userDropdown">
+              <div><strong id="dropdownName"></strong><small id="dropdownBranch"></small></div>
+              <button id="logoutBtn">Sign Out</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <section class="page active" id="dashboard">
+        <div class="section-heading">
+          <div><span class="eyebrow">EXECUTIVE OVERVIEW</span><h3>Business Performance</h3></div>
+          <div class="date-chip">Wednesday, 10 June 2026</div>
+        </div>
+        <div class="period-strip">
+          <div><span>Last completed month</span><strong>May 2026 · Locked</strong></div>
+          <div><span>Current month-to-date</span><strong>June 1–10, 2026</strong></div>
+          <button class="secondary-btn" id="refreshDashboard">Refresh Dashboard</button>
+        </div>
+        <div class="kpi-grid" id="dashboardKpis"></div>
+        <div class="analytics-grid executive-analytics-grid">
+          <article class="panel analytics-wide">
+            <div class="panel-head"><div><span class="eyebrow">MONTHLY TREND</span><h3 id="chartTitle">Income vs Expenses</h3></div><select class="control compact" id="chartMetric"><option value="financial">Financial</option><option value="production">Produced Pcs</option></select></div>
+            <div class="chart-wrap chart-xl"><canvas id="performanceChart"></canvas></div>
+          </article>
+          <article class="panel finance-only chart-card">
+            <div class="panel-head"><div><span class="eyebrow">PROFIT OVERVIEW</span><h3>Income Conversion</h3></div></div>
+            <div class="donut-shell"><canvas id="profitDonutChart"></canvas></div>
+            <div class="chart-legend" id="profitDonutLegend"></div>
+          </article>
+          <article class="panel finance-only chart-card">
+            <div class="panel-head"><div><span class="eyebrow">BRANCH MIX</span><h3>Revenue Contribution</h3></div></div>
+            <div class="donut-shell"><canvas id="branchRevenueDonutChart"></canvas></div>
+            <div class="chart-legend compact-legend" id="branchRevenueDonutLegend"></div>
+            <div class="branch-bars hidden" id="branchBars"></div>
+          </article>
+        </div>
+        <div class="analytics-grid executive-secondary-grid">
+          <article class="panel chart-card">
+            <div class="panel-head"><div><span class="eyebrow">ORDER CONTROL</span><h3>Operational Status</h3></div></div>
+            <div class="donut-shell small-donut"><canvas id="ordersPulseChart"></canvas></div>
+            <div class="chart-legend compact-legend" id="ordersPulseChartLegend"></div>
+          </article>
+          <article class="panel analytics-wide">
+            <div class="panel-head"><div><span class="eyebrow">PRODUCTION MOMENTUM</span><h3>Monthly Output Trend</h3></div><span class="metric-chip">Live</span></div>
+            <div class="chart-wrap chart-md"><canvas id="productionMomentumChart"></canvas></div>
+          </article>
+          <article class="panel executive-highlights-panel">
+            <div class="panel-head"><div><span class="eyebrow">MANAGEMENT PULSE</span><h3>Executive Highlights</h3></div></div>
+            <div class="executive-highlights" id="executiveHighlights"></div>
+          </article>
+        </div>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">CFO TABLE</span><h3>Monthly Performance Summary</h3></div><span class="lock-badge">Historical months locked</span></div>
+          <div class="table-wrap"><table><thead><tr><th>Month</th><th class="finance-only">Income</th><th class="finance-only">Expenses</th><th class="finance-only">Net Profit</th><th class="finance-only">Margin</th><th>Produced Pcs</th><th>Status</th></tr></thead><tbody id="monthlyTableBody"></tbody></table></div>
+        </article>
+      </section>
+
+
+      <section class="page" id="alerts">
+        <div class="section-heading">
+          <div><span class="eyebrow">MANAGEMENT CONTROL CENTER</span><h3>Notifications & Daily Alerts</h3></div>
+          <div class="heading-actions"><button class="secondary-btn" id="exportAlertsBtn">Export CSV</button><button class="secondary-btn" id="markAllAlertsRead">Mark All Read</button><button class="primary-btn" id="refreshAlertsBtn">Refresh Alerts</button></div>
+        </div>
+        <div class="filter-bar">
+          <select id="alertBranch" class="control"><option value="All">All Branches</option></select>
+          <span class="date-chip" id="alertDateLabel">Today</span>
+        </div>
+        <div class="kpi-grid compact-kpis" id="alertSummaryKpis"></div>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">TODAY AT A GLANCE</span><h3>Daily Management Summary</h3></div><span class="muted-note" id="dailySummaryBranch"></span></div>
+          <div class="daily-summary-grid" id="dailySummaryGrid"></div>
+        </article>
+        <div class="dashboard-grid alerts-layout">
+          <article class="panel span-2">
+            <div class="panel-head"><div><span class="eyebrow">ACTION REQUIRED</span><h3>Current Alerts</h3></div><select id="alertSeverity" class="control compact"><option value="All">All Severities</option><option value="critical">Critical</option><option value="warning">Warning</option><option value="info">Information</option></select></div>
+            <div class="alert-center-list" id="alertCenterList"></div>
+          </article>
+          <article class="panel alert-manage" id="alertSettingsPanel">
+            <div class="panel-head"><div><span class="eyebrow">EDITABLE RULES</span><h3>Alert Settings</h3></div></div>
+            <form id="alertSettingsForm" class="settings-form">
+              <label>Settings Branch<select name="branch" id="alertSettingsBranch" class="control"><option value="All">All Branches</option></select></label>
+              <label>Membership expiry warning (days)<input class="control" type="number" min="1" max="365" name="membership_expiry_days" /></label>
+              <label>Low production alert below (%)<input class="control" type="number" min="1" max="100" step="1" name="low_production_percent" /></label>
+              <label>Attendance reminder hour (0–23)<input class="control" type="number" min="0" max="23" name="attendance_reminder_hour" /></label>
+              <label>Production reminder hour (0–23)<input class="control" type="number" min="0" max="23" name="production_reminder_hour" /></label>
+              <label>Payroll reminder from day<input class="control" type="number" min="1" max="31" name="payroll_reminder_day" /></label>
+              <label>Income schedule tolerance (%)<input class="control" type="number" min="0" max="50" step="1" name="income_lag_tolerance_percent" /></label>
+              <div class="settings-switches">
+                <label><input type="checkbox" name="order_alerts" /> Orders</label><label><input type="checkbox" name="budget_alerts" /> Budgets</label>
+                <label><input type="checkbox" name="membership_alerts" /> Membership</label><label><input type="checkbox" name="attendance_alerts" /> Attendance</label>
+                <label><input type="checkbox" name="production_alerts" /> Production</label><label><input type="checkbox" name="payroll_alerts" /> Payroll</label>
+              </div>
+              <button class="primary-btn full" type="submit">Save Alert Settings</button>
+            </form>
+          </article>
+        </div>
+      </section>
+
+      <section class="page" id="orders">
+        <div class="section-heading">
+          <div><span class="eyebrow">CUSTOMER ORDER CONTROL</span><h3>Orders & Delivery Tracking</h3></div>
+          <button class="primary-btn order-write" id="addOrderBtn">+ Add Order</button>
+        </div>
+        <div class="filter-bar">
+          <select id="orderBranch" class="control"><option value="All">All Branches</option></select>
+          <select id="orderStatus" class="control"><option value="All">All Statuses</option></select>
+          <input id="orderSearch" class="control" type="search" placeholder="Order no, customer or phone" />
+          <input id="orderStart" class="control" type="date" value="2026-06-01" />
+          <input id="orderEnd" class="control" type="date" value="2026-06-30" />
+          <button class="secondary-btn" id="applyOrderFilter">Apply Filter</button>
+        </div>
+        <div class="kpi-grid compact-kpis" id="orderKpis"></div>
+        <div class="analytics-grid module-analytics-grid">
+          <article class="panel chart-card"><div class="panel-head"><div><span class="eyebrow">STATUS MIX</span><h3>Orders by Stage</h3></div></div><div class="donut-shell"><canvas id="orderStatusChart"></canvas></div><div class="chart-legend compact-legend" id="orderStatusChartLegend"></div></article>
+          <article class="panel"><div class="panel-head"><div><span class="eyebrow">BRANCH LOAD</span><h3>Order Distribution</h3></div></div><div class="chart-wrap chart-sm"><canvas id="orderBranchChart"></canvas></div></article>
+          <article class="panel chart-card order-finance"><div class="panel-head"><div><span class="eyebrow">COLLECTION CONTROL</span><h3>Advance vs Balance</h3></div></div><div class="donut-shell"><canvas id="orderCollectionChart"></canvas></div><div class="chart-legend compact-legend" id="orderCollectionChartLegend"></div></article>
+        </div>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">ORDER REGISTER</span><h3>Booking to Delivery Status</h3></div><button class="secondary-btn" id="exportOrdersBtn">Export CSV</button></div>
+          <div class="table-wrap"><table class="orders-table"><thead><tr><th>Order</th><th>Booking</th><th>Due</th><th>Customer</th><th>Phone</th><th>Branch</th><th>Item / Qty</th><th>Assigned To</th><th>Status</th><th class="order-finance">Total</th><th class="order-finance">Advance</th><th class="order-finance">Balance</th><th class="order-write">Actions</th></tr></thead><tbody id="ordersTableBody"></tbody></table></div>
+        </article>
+        <article class="panel info-panel"><h3>Production workflow</h3><p>Order status can move from New Booking → Measurement → Cutting → Body Making → Daraz/Design → Button → Ironing → Quality Check → Ready → Delivered. Overdue active orders are automatically highlighted.</p></article>
+      </section>
+
+
+      <section class="page" id="membership">
+        <div class="section-heading">
+          <div><span class="eyebrow">CUSTOMER VALUE MANAGEMENT</span><h3>Membership Cards & CRM</h3></div>
+          <div class="heading-actions membership-write">
+            <button class="secondary-btn" id="addCustomerBtn">+ Add Customer</button>
+            <button class="secondary-btn" id="managePlansBtn">Manage Plans</button>
+            <button class="primary-btn" id="issueCardBtn">+ Issue Card</button>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <select id="membershipBranch" class="control"><option value="All">All Branches</option></select>
+          <select id="membershipStatus" class="control"><option value="All">All Statuses</option></select>
+          <input id="membershipSearch" class="control" type="search" placeholder="Card number, customer, phone or sales agent" />
+          <button class="secondary-btn" id="applyMembershipFilter">Apply Filter</button>
+        </div>
+        <div class="kpi-grid compact-kpis" id="membershipKpis"></div>
+        <div class="analytics-grid module-analytics-grid">
+          <article class="panel chart-card"><div class="panel-head"><div><span class="eyebrow">PORTFOLIO MIX</span><h3>Cards by Plan</h3></div></div><div class="donut-shell"><canvas id="membershipPlanChart"></canvas></div><div class="chart-legend compact-legend" id="membershipPlanChartLegend"></div></article>
+          <article class="panel"><div class="panel-head"><div><span class="eyebrow">WALLET LIABILITY</span><h3>Balance by Plan</h3></div></div><div class="chart-wrap chart-sm"><canvas id="membershipWalletChart"></canvas></div></article>
+          <article class="panel"><div class="panel-head"><div><span class="eyebrow">SALES PERFORMANCE</span><h3>Agent Commission</h3></div></div><div class="chart-wrap chart-sm"><canvas id="membershipAgentChart"></canvas></div></article>
+        </div>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">CARD REGISTER</span><h3>Active & Historical Membership Cards</h3></div><button class="secondary-btn" id="exportMembershipBtn">Export CSV</button></div>
+          <div class="table-wrap"><table class="wide-table"><thead><tr><th>Card Number</th><th>Customer</th><th>Phone</th><th>Plan</th><th>Branch</th><th>Sales Agent</th><th>Issue</th><th>Expiry</th><th>Current Balance</th><th>Commission</th><th>Status</th><th>Actions</th></tr></thead><tbody id="membershipTableBody"></tbody></table></div>
+        </article>
+        <div class="dashboard-grid membership-grid">
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">CUSTOMER DIRECTORY</span><h3>Customers</h3></div><span class="muted-note" id="customerCountLabel"></span></div>
+            <div class="table-wrap"><table><thead><tr><th>Customer</th><th>Phone</th><th>Branch</th><th>Cards</th><th>Active Balance</th><th class="membership-write">Action</th></tr></thead><tbody id="customerTableBody"></tbody></table></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">CARD PRODUCTS</span><h3>Membership Plans</h3></div></div>
+            <div id="membershipPlanCards" class="plan-list"></div>
+          </article>
+        </div>
+        <article class="panel commission-panel">
+          <div class="panel-head commission-head">
+            <div><span class="eyebrow">SALES INCENTIVE CONTROL</span><h3>Monthly Card-Selling Commission</h3></div>
+            <div class="commission-filters">
+              <input id="commissionMonth" class="control" type="month" value="2026-06" />
+              <button class="secondary-btn" id="applyCommissionFilter">Apply</button>
+              <button class="secondary-btn" id="exportCommissionBtn">Export CSV</button>
+            </div>
+          </div>
+          <div class="kpi-grid compact-kpis" id="commissionKpis"></div>
+          <div class="table-wrap"><table><thead><tr><th>Sales Agent</th><th>Designation</th><th>Branch</th><th>Cards Sold</th><th>Total Card Sales</th><th>Commission Payable</th></tr></thead><tbody id="commissionTableBody"></tbody></table></div>
+          <p class="muted-note commission-note">Commission is calculated from the actual card sale price and saved with each card. Default rate: 10%.</p>
+        </article>
+      </section>
+
+      <section class="page" id="production">
+        <div class="section-heading">
+          <div><span class="eyebrow">LIVE WORKSHOP CONTROL</span><h3>Production Report</h3></div>
+          <div class="heading-actions production-write">
+            <button class="secondary-btn" id="addReadyCompletedBtn">+ Total Ready Completed</button>
+            <button class="primary-btn" id="addProductionBtn">+ Add Production</button>
+          </div>
+        </div>
+        <div class="filter-bar">
+          <select id="prodBranch" class="control"><option value="All">All Branches</option></select>
+          <select id="prodEmployee" class="control"><option value="">All Employees</option></select>
+          <input id="prodStart" class="control" type="date" value="2026-06-01" />
+          <input id="prodEnd" class="control" type="date" value="2026-06-10" />
+          <button class="secondary-btn" id="applyProductionFilter">Apply Filter</button>
+        </div>
+        <div class="kpi-grid compact-kpis" id="productionKpis"></div>
+        <article class="panel production-flow-panel">
+          <div class="panel-head"><div><span class="eyebrow">PRODUCTION STAGES OVERVIEW</span><h3>Workshop Flow & Stage Output</h3></div><span class="metric-chip">Live Workshop</span></div>
+          <div class="production-stage-flow" id="productionStageFlow"></div>
+        </article>
+        <div class="analytics-grid production-analytics-grid">
+          <article class="panel analytics-wide"><div class="panel-head"><div><span class="eyebrow">EMPLOYEE PRODUCTIVITY</span><h3>Top Output by Employee</h3></div></div><div class="chart-wrap chart-md"><canvas id="productionEmployeeChart"></canvas></div></article>
+          <article class="panel chart-card"><div class="panel-head"><div><span class="eyebrow">ACTIVITY MIX</span><h3>Production Composition</h3></div></div><div class="donut-shell"><canvas id="productionMixChart"></canvas></div><div class="chart-legend compact-legend" id="productionMixChartLegend"></div></article>
+          <article class="panel leaderboard-panel"><div class="panel-head"><div><span class="eyebrow">LEADERBOARD</span><h3>Top Performers</h3></div></div><div class="leaderboard-list" id="productionLeaderboard"></div></article>
+        </div>
+        <article class="panel ready-completed-panel">
+          <div class="panel-head">
+            <div><span class="eyebrow">WORKSHOP DAY-END OUTPUT</span><h3>Total Ready Completed</h3><p class="muted-note">Final complete dishdashas ready at day end. This is separate from employee activity quantities.</p></div>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Day</th><th>Branch</th><th>Total Ready Completed</th><th>Notes</th><th>Entered By</th><th class="production-write">Actions</th></tr></thead><tbody id="dailyReadyCompletedBody"></tbody></table></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">EMPLOYEE TOTALS</span><h3>Current Production Summary</h3></div><button class="secondary-btn" id="exportProductionBtn">Export CSV</button></div>
+          <div class="table-wrap"><table class="wide-table"><thead><tr><th>Employee</th><th>Branch</th><th>Body</th><th>Joint/Side</th><th>Full Body</th><th>Daraz</th><th>VIP Design</th><th>Button</th><th>Alteration</th><th>Cutting</th><th>Iron</th><th>Total Activity</th><th>Total Pcs Produced</th><th>OT</th><th>History</th></tr></thead><tbody id="productionSummaryBody"></tbody></table></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">DAILY BREAKUP</span><h3>Daily Production Entries</h3></div></div>
+          <div class="table-wrap"><table class="wide-table"><thead><tr><th>Date</th><th>Day</th><th>Employee</th><th>Branch</th><th>Activity</th><th>Pcs Done</th><th>Produced</th><th>OT</th><th>Entered By</th><th class="production-write">Actions</th></tr></thead><tbody id="productionEntriesBody"></tbody></table></div>
+        </article>
+      </section>
+
+      <section class="page" id="financials">
+        <div class="section-heading">
+          <div><span class="eyebrow">FINANCIAL CONTROL</span><h3>Income & Expense Register</h3></div>
+          <button class="primary-btn finance-write" id="addFinanceBtn">+ Add Entry</button>
+        </div>
+        <div class="filter-bar">
+          <select id="financeBranch" class="control"><option value="All">All Branches</option></select>
+          <input id="financeStart" class="control" type="date" value="2026-06-01" />
+          <input id="financeEnd" class="control" type="date" value="2026-06-10" />
+          <button class="secondary-btn" id="applyFinanceFilter">Apply Filter</button>
+        </div>
+        <div class="kpi-grid compact-kpis" id="financeKpis"></div>
+        <div class="analytics-grid module-analytics-grid">
+          <article class="panel chart-card"><div class="panel-head"><div><span class="eyebrow">EXPENSE COMPOSITION</span><h3>Category Breakdown</h3></div></div><div class="donut-shell"><canvas id="financeExpenseChart"></canvas></div><div class="chart-legend compact-legend" id="financeExpenseChartLegend"></div></article>
+          <article class="panel chart-card"><div class="panel-head"><div><span class="eyebrow">PAYMENT CHANNELS</span><h3>Transaction Mix</h3></div></div><div class="donut-shell"><canvas id="financePaymentChart"></canvas></div><div class="chart-legend compact-legend" id="financePaymentChartLegend"></div></article>
+          <article class="panel"><div class="panel-head"><div><span class="eyebrow">BRANCH PERFORMANCE</span><h3>Income by Branch</h3></div></div><div class="chart-wrap chart-sm"><canvas id="financeBranchChart"></canvas></div></article>
+        </div>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">TRANSACTION REGISTER</span><h3>Current Entries</h3></div><button class="secondary-btn" id="exportFinanceBtn">Export CSV</button></div>
+          <div class="table-wrap"><table class="wide-table"><thead><tr><th>Date</th><th>Branch</th><th>Type</th><th>Category</th><th>Description</th><th>Payment</th><th>Reference</th><th>Amount</th><th>Entered By</th><th class="finance-write">Actions</th></tr></thead><tbody id="financeTableBody"></tbody></table></div>
+        </article>
+      </section>
+
+      <section class="page" id="posSales">
+        <div class="section-heading">
+          <div><span class="eyebrow">SALES DATA MANAGEMENT</span><h3>Sales, Customers & Outstanding Dues</h3></div>
+          <button class="primary-btn finance-write" id="openPosImportBtn">⇩ Import Sales File</button>
+        </div>
+        <div class="filter-bar">
+          <select id="posBranch" class="control"><option value="All">All Branches</option></select>
+          <input id="posStart" class="control" type="date" value="2026-06-01" />
+          <input id="posEnd" class="control" type="date" value="2026-06-30" />
+          <select id="posStatus" class="control"><option value="All">All Payment Statuses</option><option>Paid</option><option>Partial</option><option>Due</option></select>
+          <input id="posSearch" class="control" type="search" placeholder="Invoice, customer, phone or salesman" />
+          <button class="secondary-btn" id="applyPosFilter">Apply Filter</button>
+        </div>
+        <div class="kpi-grid compact-kpis" id="posKpis"></div>
+        <div class="analytics-grid module-analytics-grid">
+          <article class="panel analytics-wide"><div class="panel-head"><div><span class="eyebrow">SALES TREND</span><h3>Daily Invoice Value</h3></div></div><div class="chart-wrap chart-md"><canvas id="salesTrendChart"></canvas></div></article>
+          <article class="panel chart-card"><div class="panel-head"><div><span class="eyebrow">PAYMENT HEALTH</span><h3>Paid, Partial & Due</h3></div></div><div class="donut-shell"><canvas id="salesStatusChart"></canvas></div><div class="chart-legend compact-legend" id="salesStatusChartLegend"></div></article>
+          <article class="panel"><div class="panel-head"><div><span class="eyebrow">CUSTOMER VALUE</span><h3>Top Customers</h3></div></div><div class="chart-wrap chart-sm"><canvas id="salesCustomerChart"></canvas></div></article>
+        </div>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">SALES REGISTER</span><h3>Invoice-Level Sales Detail</h3></div><button class="secondary-btn" id="exportPosSalesBtn">Export CSV</button></div>
+          <div class="table-wrap"><table class="wide-table pos-sales-table"><thead><tr><th>Date & Time</th><th>Invoice</th><th>Customer</th><th>Phone</th><th>Branch</th><th>Payment Status</th><th>Payment Method</th><th>Total</th><th>Paid</th><th>Due</th><th>Items</th><th>Added By</th><th>Notes</th><th class="finance-write">Action</th></tr></thead><tbody id="posSalesTableBody"></tbody></table></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">IMPORT HISTORY</span><h3>Recent Sales Uploads</h3></div><span class="muted-note">The same invoice number is updated, not duplicated.</span></div>
+          <div class="table-wrap"><table class="wide-table"><thead><tr><th>Imported At</th><th>File</th><th>Branch Mode</th><th>Rows</th><th>New</th><th>Updated</th><th>Unchanged</th><th>Invalid</th><th>Customers Added</th><th>Financial Posting</th><th>Imported By</th></tr></thead><tbody id="posImportHistoryBody"></tbody></table></div>
+        </article>
+      </section>
+
+      <section class="page" id="employees">
+        <div class="section-heading">
+          <div><span class="eyebrow">WORKFORCE MANAGEMENT</span><h3>Employees & Work Categories</h3></div>
+          <button class="primary-btn employee-write" id="addEmployeeBtn">+ Add Employee</button>
+        </div>
+        <div class="filter-bar employee-toolbar">
+          <input id="employeeSearch" class="control" type="search" placeholder="Search employee or designation" />
+          <label class="checkbox-row employee-write"><input type="checkbox" id="showInactiveEmployees" /> Show inactive employees</label>
+          <span class="toolbar-note">Use the top branch filter to view Al Khoud, Azaiba or Nizwa staff.</span>
+        </div>
+        <div class="analytics-grid workforce-analytics-grid">
+          <article class="panel analytics-wide"><div class="panel-head"><div><span class="eyebrow">WORKFORCE OUTPUT</span><h3>Employee Production Ranking</h3></div></div><div class="chart-wrap chart-md"><canvas id="employeeOutputChart"></canvas></div></article>
+          <article class="panel chart-card"><div class="panel-head"><div><span class="eyebrow">BRANCH HEADCOUNT</span><h3>Team Distribution</h3></div></div><div class="donut-shell"><canvas id="employeeBranchChart"></canvas></div><div class="chart-legend compact-legend" id="employeeBranchChartLegend"></div></article>
+          <article class="panel leaderboard-panel"><div class="panel-head"><div><span class="eyebrow">PERFORMANCE</span><h3>Top Employees</h3></div></div><div class="leaderboard-list" id="employeeLeaderboard"></div></article>
+        </div>
+        <div class="employee-grid" id="employeeGrid"></div>
+      </section>
+
+
+      <section class="page" id="payroll">
+        <div class="section-heading">
+          <div><span class="eyebrow">WORKFORCE FINANCE</span><h3>Payroll & Attendance</h3></div>
+          <div class="heading-actions"><button class="secondary-btn attendance-write" id="addAttendanceBtn">+ Attendance</button></div>
+        </div>
+        <div class="filter-bar">
+          <select id="payrollBranch" class="control"><option value="All">All Branches</option></select>
+          <input id="payrollMonth" class="control" type="month" value="2026-06" />
+          <button class="secondary-btn" id="applyPayrollFilter">Apply Filter</button>
+        </div>
+        <div class="payroll-read">
+          <div class="kpi-grid compact-kpis" id="payrollKpis"></div>
+          <div class="analytics-grid module-analytics-grid">
+            <article class="panel chart-card"><div class="panel-head"><div><span class="eyebrow">PAYROLL MIX</span><h3>Salary Composition</h3></div></div><div class="donut-shell"><canvas id="payrollCompositionChart"></canvas></div><div class="chart-legend compact-legend" id="payrollCompositionChartLegend"></div></article>
+            <article class="panel chart-card"><div class="panel-head"><div><span class="eyebrow">ATTENDANCE HEALTH</span><h3>Monthly Status Mix</h3></div></div><div class="donut-shell"><canvas id="attendanceMixChart"></canvas></div><div class="chart-legend compact-legend" id="attendanceMixChartLegend"></div></article>
+            <article class="panel"><div class="panel-head"><div><span class="eyebrow">BRANCH PAYROLL</span><h3>Net Salary by Branch</h3></div></div><div class="chart-wrap chart-sm"><canvas id="payrollBranchChart"></canvas></div></article>
+          </div>
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">MONTHLY SALARY REGISTER</span><h3>Editable Payroll</h3></div><button class="secondary-btn" id="exportPayrollBtn">Export Payroll CSV</button></div>
+            <div class="table-wrap"><table class="wide-table"><thead><tr><th>Employee</th><th>Branch</th><th>Basic Salary</th><th>Attendance</th><th>Commission</th><th>Bonus</th><th>OT Amount</th><th>Allowance</th><th>Advance</th><th>Deductions</th><th>Net Salary</th><th>Status</th><th class="payroll-write">Action</th></tr></thead><tbody id="payrollTableBody"></tbody></table></div>
+          </article>
+        </div>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">DAILY ATTENDANCE</span><h3>Attendance Register</h3></div><button class="secondary-btn" id="exportAttendanceBtn">Export Attendance CSV</button></div>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Branch</th><th>Status</th><th>Notes</th><th>Entered By</th><th class="attendance-write">Action</th></tr></thead><tbody id="attendanceTableBody"></tbody></table></div>
+        </article>
+        <article class="panel info-panel payroll-read"><h3>Editable payroll workflow</h3><p>Basic salary is saved once in the employee profile. Commission, bonus, overtime amount, allowance, advance and deductions remain editable separately for every month.</p></article>
+      </section>
+
+      <section class="page" id="budget">
+        <div class="section-heading">
+          <div><span class="eyebrow">CFO PLANNING & CONTROL</span><h3>Budgets, Limits & Variance</h3></div>
+          <div class="heading-actions budget-write"><button class="secondary-btn" id="manageBudgetCategoriesBtn">Manage Categories</button><button class="primary-btn" id="saveBudgetBtn">Save Budget</button></div>
+        </div>
+        <div class="filter-bar">
+          <select id="budgetBranch" class="control"><option value="All">All Branches</option></select>
+          <input id="budgetMonth" class="control" type="month" value="2026-06" />
+          <button class="secondary-btn" id="applyBudgetFilter">Apply Filter</button>
+          <button class="secondary-btn budget-write" id="copyBudgetBtn">Copy Previous Month</button>
+          <button class="secondary-btn" id="exportBudgetBtn">Export CSV</button>
+          <span class="budget-status-pill" id="budgetStatusPill">Not Created</span>
+        </div>
+        <div class="kpi-grid compact-kpis" id="budgetKpis"></div>
+        <div class="analytics-grid budget-analytics-grid">
+          <article class="panel analytics-wide"><div class="panel-head"><div><span class="eyebrow">BUDGET VS ACTUAL</span><h3>Category Variance</h3></div></div><div class="chart-wrap chart-md"><canvas id="budgetVarianceChart"></canvas></div></article>
+          <article class="panel chart-card"><div class="panel-head"><div><span class="eyebrow">UTILIZATION</span><h3>Expense Budget Used</h3></div></div><div class="donut-shell"><canvas id="budgetUtilizationChart"></canvas></div><div class="chart-legend compact-legend" id="budgetUtilizationChartLegend"></div></article>
+          <article class="panel"><div class="panel-head"><div><span class="eyebrow">BRANCH PROFITABILITY</span><h3>Profit by Branch</h3></div></div><div class="chart-wrap chart-sm"><canvas id="budgetBranchProfitChart"></canvas></div></article>
+        </div>
+        <div class="dashboard-grid budget-target-grid">
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">INCOME TARGETS</span><h3>Editable Monthly Targets</h3></div></div>
+            <div class="budget-target-form">
+              <label>Shop Sales Target (OMR)<input id="budgetShopTarget" class="control budget-input" type="number" min="0" step="0.001" /></label>
+              <label>Membership Target (OMR)<input id="budgetMembershipTarget" class="control budget-input" type="number" min="0" step="0.001" /></label>
+              <label>Other Income Target (OMR)<input id="budgetOtherTarget" class="control budget-input" type="number" min="0" step="0.001" /></label>
+              <label>Minimum Profit Margin (%)<input id="budgetProfitMargin" class="control budget-input" type="number" min="0" max="100" step="0.1" /></label>
+              <label class="span-2">Target Notes<input id="budgetTargetNotes" class="control budget-input" placeholder="Season, campaign or management assumptions" /></label>
+            </div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">FORECAST</span><h3>Month-End Projection</h3></div></div>
+            <div class="forecast-list" id="budgetForecast"></div>
+          </article>
+        </div>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">EXPENSE LIMITS</span><h3>Editable Category Budget vs Actual</h3></div><span class="muted-note" id="budgetEditHint">Select one branch to edit.</span></div>
+          <div class="table-wrap"><table class="budget-table wide-table"><thead><tr><th>Expense Category</th><th>Monthly Budget</th><th>Actual</th><th>Remaining</th><th>Used</th><th>Warning At</th><th>Status</th><th>Notes</th></tr></thead><tbody id="budgetTableBody"></tbody></table></div>
+          <div class="budget-plan-footer budget-write">
+            <label>Budget Revision Reason<input id="budgetRevisionReason" class="control" placeholder="Example: Extra Eid fabric purchasing" /></label>
+            <label>Plan Notes<input id="budgetPlanNotes" class="control" placeholder="Optional monthly budget notes" /></label>
+          </div>
+        </article>
+        <div class="dashboard-grid">
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">BRANCH PERFORMANCE</span><h3>Budget & Actual by Branch</h3></div></div>
+            <div class="table-wrap"><table><thead><tr><th>Branch</th><th>Income Target</th><th>Actual Income</th><th>Expense Budget</th><th>Actual Expense</th><th>Profit</th></tr></thead><tbody id="budgetBranchTableBody"></tbody></table></div>
+          </article>
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">APPROVAL CONTROL</span><h3>Budget Status</h3></div></div>
+            <div class="budget-status-actions budget-approve" id="budgetStatusActions">
+              <button class="secondary-btn" data-budget-status="Draft">Unlock / Draft</button>
+              <button class="secondary-btn" data-budget-status="Approved">Approve</button>
+              <button class="primary-btn" data-budget-status="Locked">Approve & Lock</button>
+              <button class="secondary-btn" data-budget-status="Closed">Close Month</button>
+            </div>
+            <p class="muted-note">Locked and closed budgets cannot be edited until Owner or Administrator changes the status back to Draft.</p>
+          </article>
+        </div>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">REVISION HISTORY</span><h3>Budget Changes & Reasons</h3></div></div>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Branch</th><th>Category</th><th>Previous</th><th>Revised</th><th>Warning</th><th>Reason</th><th>Changed By</th></tr></thead><tbody id="budgetRevisionBody"></tbody></table></div>
+        </article>
+      </section>
+
+      <section class="page" id="reports">
+        <div class="section-heading"><div><span class="eyebrow">MANAGEMENT REPORTS</span><h3>Report & Backup Center</h3></div></div>
+        <div class="report-grid">
+          <button class="report-card finance-report" id="reportFinance"><span>◈</span><strong>Financial Entries</strong><small>Download complete income and expense register as CSV.</small></button>
+          <button class="report-card finance-report" id="reportPosSales"><span>⇩</span><strong>Sales Record</strong><small>Download imported customer, invoice, payment and due details.</small></button>
+          <button class="report-card" id="reportProduction"><span>⚙</span><strong>Production Entries</strong><small>Download filtered daily production records as CSV.</small></button>
+          <button class="report-card" id="reportOrders"><span>◇</span><strong>Customer Orders</strong><small>Download booking, due date, status and delivery records.</small></button>
+          <button class="report-card" id="reportMembership"><span>♢</span><strong>Membership Cards</strong><small>Download card, customer, plan, expiry and wallet balances.</small></button>
+          <button class="report-card budget-read" id="reportBudget"><span>▥</span><strong>Budget vs Actual</strong><small>Download branch and category budget variance report.</small></button>
+          <button class="report-card payroll-read" id="reportPayroll"><span>▦</span><strong>Monthly Payroll</strong><small>Download saved employee salary calculations for the selected month.</small></button>
+          <button class="report-card" id="reportAttendance"><span>◉</span><strong>Attendance Register</strong><small>Download monthly attendance by branch and employee.</small></button>
+          <button class="report-card finance-report" id="reportCommissions"><span>%</span><strong>Sales Agent Commission</strong><small>Download monthly card-selling commission by sales agent.</small></button>
+          <button class="report-card backup-only" id="backupDatabase"><span>▣</span><strong>Database Backup</strong><small>Download a full SQLite database safety copy.</small></button>
+          <button class="report-card" id="printDashboard"><span>▤</span><strong>Print Dashboard</strong><small>Print or save the current dashboard as PDF.</small></button>
+        </div>
+        <article class="panel info-panel"><h3>Data protection workflow</h3><p>Entries are stored in <strong>dar_al_sultan.db</strong>. Download a database backup regularly and keep a copy in Google Drive or another secure location.</p></article>
+      </section>
+
+      <section class="page" id="audit">
+        <div class="section-heading"><div><span class="eyebrow">INTERNAL CONTROL</span><h3>Audit Log</h3></div><button class="secondary-btn" id="refreshAudit">Refresh</button></div>
+        <article class="panel"><div class="table-wrap"><table class="wide-table"><thead><tr><th>Date & Time</th><th>User</th><th>Action</th><th>Module</th><th>Record</th><th>Details</th></tr></thead><tbody id="auditTableBody"></tbody></table></div></article>
+      </section>
+
+      <section class="page" id="users">
+        <div class="section-heading"><div><span class="eyebrow">ACCESS CONTROL</span><h3>Users & Permissions</h3></div><div class="heading-actions"><button class="secondary-btn" id="addRoleBtn">+ Add Role</button><button class="primary-btn" id="addUserBtn">+ Add User</button></div></div>
+        <article class="panel"><div class="panel-head"><div><span class="eyebrow">USER ACCOUNTS</span><h3>Users</h3></div></div><div class="table-wrap"><table><thead><tr><th>Username</th><th>Full Name</th><th>Role</th><th>Branch</th><th>Status</th><th>Created</th><th>Action</th></tr></thead><tbody id="usersTableBody"></tbody></table></div></article>
+        <article class="panel role-management-panel"><div class="panel-head"><div><span class="eyebrow">EDITABLE ACCESS MATRIX</span><h3>Roles & Permission Sets</h3></div><span class="muted-note">Edit a role to control exactly what its users can view or update.</span></div><div class="table-wrap"><table><thead><tr><th>Role</th><th>Description</th><th>Permissions</th><th>Status</th><th>Action</th></tr></thead><tbody id="rolesTableBody"></tbody></table></div></article>
+        <div class="permission-notes">
+          <article><strong>Production Supervisor</strong><span>Default access includes production entry, production details, attendance and orders for the assigned branch.</span></article>
+          <article><strong>Custom Roles</strong><span>Add a new role and select only the permissions required for that job.</span></article>
+        </div>
+      </section>
+    </main>
+  </div>
+
+
+  <div class="modal" id="orderModal">
+    <div class="modal-card large-modal">
+      <div class="modal-head"><div><span class="eyebrow">ORDER MANAGEMENT</span><h3 id="orderModalTitle">Add Customer Order</h3></div><button class="icon-btn" data-close="orderModal">×</button></div>
+      <form id="orderForm" class="form-grid">
+        <input type="hidden" name="id" />
+        <label>Order Number<input name="order_no" placeholder="Automatic when left blank" /></label>
+        <label>Branch<select required name="branch" id="orderEntryBranch"></select></label>
+        <label>Booking Date<input required type="date" name="booking_date" value="2026-06-10" /></label>
+        <label>Due / Delivery Date<input required type="date" name="due_date" value="2026-06-17" /></label>
+        <label>Customer Name<input required name="customer_name" /></label>
+        <label>Phone Number<input name="phone" /></label>
+        <label>Item Type<select required name="item_type" id="orderItemType"></select></label>
+        <label>Quantity<input required min="1" step="1" type="number" name="quantity" value="1" /></label>
+        <label>Assigned Employee<select name="assigned_employee_id" id="orderAssignedEmployee"></select></label>
+        <label>Status<select required name="status" id="orderEntryStatus"></select></label>
+        <label class="order-finance">Total Amount (OMR)<input min="0" step="0.001" type="number" name="total_amount" value="0" /></label>
+        <label class="order-finance">Advance Paid (OMR)<input min="0" step="0.001" type="number" name="advance_amount" value="0" /></label>
+        <label class="span-2">Notes<input name="notes" placeholder="Fabric, design, measurement or delivery notes" /></label>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="orderModal">Cancel</button><button type="submit" class="primary-btn">Save Order</button></div>
+      </form>
+    </div>
+  </div>
+
+
+  <div class="modal" id="customerModal">
+    <div class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow">CUSTOMER CRM</span><h3 id="customerModalTitle">Add Customer</h3></div><button class="icon-btn" data-close="customerModal">×</button></div>
+      <form id="customerForm" class="form-grid">
+        <input type="hidden" name="id" />
+        <label>Customer Name<input required name="name" /></label>
+        <label>Branch<select required name="branch" id="customerBranchSelect"></select></label>
+        <label>Phone Number<input name="phone" /></label>
+        <label>Email<input type="email" name="email" /></label>
+        <label class="span-2">Address<input name="address" /></label>
+        <label class="span-2">Notes<input name="notes" /></label>
+        <label class="checkbox-row span-2"><input type="checkbox" name="active" checked /> Active customer</label>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="customerModal">Cancel</button><button type="submit" class="primary-btn">Save Customer</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="membershipCardModal">
+    <div class="modal-card large-modal">
+      <div class="modal-head"><div><span class="eyebrow">MEMBERSHIP CARD</span><h3 id="membershipCardModalTitle">Issue Membership Card</h3></div><button class="icon-btn" data-close="membershipCardModal">×</button></div>
+      <form id="membershipCardForm" class="form-grid">
+        <input type="hidden" name="id" />
+        <label>Card Number<input required name="card_no" placeholder="Enter your existing card series number" /><small>Manual entry required. Duplicate numbers are blocked.</small></label>
+        <label>Branch<select required name="branch" id="membershipCardBranch"></select></label>
+        <label>Customer<select required name="customer_id" id="membershipCustomerSelect"></select></label>
+        <label>Card Plan<select required name="plan_id" id="membershipPlanSelect"></select></label>
+        <label class="span-2">Sales Agent
+          <div class="inline-input-action"><input name="sales_agent_name" id="membershipSalesAgentName" list="membershipSalesAgentList" placeholder="Type sales agent name or leave blank for direct sale" /><button type="button" class="secondary-btn employee-write" id="quickAddSalesAgentBtn">+ Add Sales Agent</button></div>
+          <datalist id="membershipSalesAgentList"></datalist>
+          <small>Existing employee names appear as suggestions. A new name can also be typed manually.</small>
+        </label>
+        <label>Commission Rate (%)<input required min="0" max="100" step="0.01" type="number" name="commission_rate" value="10" /></label>
+        <label>Issue Date<input required type="date" name="issue_date" value="2026-06-10" /></label>
+        <label>Expiry Date<input type="date" name="expiry_date" /><small>Leave blank for automatic plan validity.</small></label>
+        <label>Sale Price (OMR)<input min="0" step="0.001" type="number" name="sale_price" value="0" /></label>
+        <label>Opening Wallet (OMR)<input min="0" step="0.001" type="number" name="opening_balance" value="0" /></label>
+        <label>Status<select required name="status" id="membershipCardStatus"></select></label>
+        <label>Payment Method<select name="payment_method"><option>Visa</option><option>Online</option><option>Cash</option><option>Bank</option><option>Other</option></select></label>
+        <label class="span-2">Notes<input name="notes" /></label>
+        <label class="checkbox-row span-2 finance-write" id="recordFinanceRow"><input type="checkbox" name="record_finance" checked /> Record card sale automatically in Financials</label>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="membershipCardModal">Cancel</button><button type="submit" class="primary-btn">Save Card</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="membershipTransactionModal">
+    <div class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow">CARD WALLET</span><h3 id="membershipTransactionTitle">Use Membership Balance</h3></div><button class="icon-btn" data-close="membershipTransactionModal">×</button></div>
+      <div class="wallet-summary"><span>Available Balance</span><strong id="transactionAvailableBalance">OMR 0.00</strong></div>
+      <form id="membershipTransactionForm" class="form-grid">
+        <input type="hidden" name="card_id" />
+        <label>Date<input required type="date" name="date" value="2026-06-10" /></label>
+        <label>Transaction Type<select required name="type" id="membershipTransactionType"></select></label>
+        <label>Amount (OMR)<input required min="0.001" step="0.001" type="number" name="amount" /></label>
+        <label>Reference<input name="reference" placeholder="Invoice or order number" /></label>
+        <label class="span-2">Notes<input name="notes" /></label>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="membershipTransactionModal">Cancel</button><button type="submit" class="primary-btn">Save Transaction</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="membershipHistoryModal">
+    <div class="modal-card large-modal">
+      <div class="modal-head"><div><span class="eyebrow">WALLET HISTORY</span><h3 id="membershipHistoryTitle">Card Transactions</h3></div><button class="icon-btn" data-close="membershipHistoryModal">×</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Date</th><th>Type</th><th>Amount</th><th>Reference</th><th>Notes</th><th>Entered By</th></tr></thead><tbody id="membershipHistoryBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="modal" id="membershipPlansModal">
+    <div class="modal-card large-modal">
+      <div class="modal-head"><div><span class="eyebrow">CARD PRODUCTS</span><h3>Manage Membership Plans</h3></div><button class="icon-btn" data-close="membershipPlansModal">×</button></div>
+      <div class="modal-toolbar"><button class="primary-btn" id="addPlanBtn">+ Add Plan</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Plan</th><th>Price</th><th>Wallet</th><th>Benefit</th><th>Validity</th><th>Deliveries</th><th>Status</th><th>Action</th></tr></thead><tbody id="membershipPlansTableBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="modal" id="membershipPlanFormModal">
+    <div class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow">MEMBERSHIP PLAN</span><h3 id="membershipPlanFormTitle">Add Plan</h3></div><button class="icon-btn" data-close="membershipPlanFormModal">×</button></div>
+      <form id="membershipPlanForm" class="form-grid">
+        <input type="hidden" name="id" />
+        <label>Plan Name<input required name="name" /></label>
+        <label>Sale Price (OMR)<input required min="0" step="0.001" type="number" name="sale_price" /></label>
+        <label>Wallet Balance (OMR)<input required min="0" step="0.001" type="number" name="wallet_balance" /></label>
+        <label>Benefit Amount (OMR)<input required min="0" step="0.001" type="number" name="benefit_amount" /></label>
+        <label>Validity (Months)<input required min="1" step="1" type="number" name="validity_months" value="12" /></label>
+        <label>Free Deliveries<input required min="-1" step="1" type="number" name="free_deliveries" value="0" /><small>Use -1 for unlimited.</small></label>
+        <label class="checkbox-row span-2"><input type="checkbox" name="active" checked /> Active plan</label>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="membershipPlanFormModal">Cancel</button><button type="submit" class="primary-btn">Save Plan</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="productionModal">
+    <div class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow">PRODUCTION ENTRY</span><h3 id="productionModalTitle">Record Daily Production</h3></div><button class="icon-btn" data-close="productionModal">×</button></div>
+      <form id="productionForm" class="form-grid">
+        <input type="hidden" name="id" />
+        <label>Date<input required type="date" name="date" value="2026-06-10" /></label>
+        <label>Branch<select required name="branch" id="productionEntryBranch"></select></label>
+        <label>Employee<select required name="employee_id" id="productionEntryEmployee"></select></label>
+        <div class="span-2 production-pair-fields hidden" id="productionPairFields">
+          <div class="production-formula-banner"><strong>Body Formula</strong><span>1 Body + 1 Joint/Side = 1 Full Body Produced</span></div>
+          <div class="paired-production-inputs">
+            <label>Body Pcs Done<input min="0" step="1" type="number" name="body_quantity" value="0" /></label>
+            <label>Joint/Side Pcs Done<input min="0" step="1" type="number" name="joint_quantity" value="0" /></label>
+          </div>
+        </div>
+        <div class="span-2 production-single-fields" id="productionSingleFields">
+          <div class="paired-production-inputs">
+            <label>Activity<select name="activity" id="productionActivity"></select></label>
+            <label>Pcs Done<input min="0" step="1" type="number" name="quantity" value="1" /></label>
+          </div>
+        </div>
+        <div class="production-output-preview span-2"><span>Calculated Production</span><strong id="productionProducedPreview">0 pcs</strong><small id="productionFormulaNote">For Daraz, VIP Design, Iron and Cutting: 1 pc done = 1 pc produced.</small></div>
+        <label>Overtime Hours<input required min="0" step="0.5" type="number" name="ot_hours" value="0" /></label>
+        <label class="span-2">Notes<input name="notes" placeholder="Optional notes" /></label>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="productionModal">Cancel</button><button type="submit" class="primary-btn">Save Production</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="readyCompletedModal">
+    <div class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow">WORKSHOP DAY-END</span><h3 id="readyCompletedModalTitle">Record Total Ready Completed</h3></div><button class="icon-btn" data-close="readyCompletedModal">×</button></div>
+      <form id="readyCompletedForm" class="form-grid">
+        <input type="hidden" name="id" />
+        <label>Date<input required type="date" name="date" value="2026-06-10" /></label>
+        <label>Branch<select required name="branch" id="readyCompletedBranch"></select></label>
+        <label class="span-2">Total Ready Completed<input required min="0" step="1" type="number" name="total_ready_completed" value="0" /><small>Final full dishdashas completed and ready at the end of this day.</small></label>
+        <label class="span-2">Notes<input name="notes" placeholder="Optional day-end workshop note" /></label>
+        <div class="production-output-preview span-2"><span>WhatsApp report line</span><strong id="readyCompletedPreview">Total ready completed = 0</strong></div>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="readyCompletedModal">Cancel</button><button type="submit" class="primary-btn">Save Total Ready</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="financeModal">
+    <div class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow">FINANCIAL ENTRY</span><h3 id="financeModalTitle">Record Income or Expense</h3></div><button class="icon-btn" data-close="financeModal">×</button></div>
+      <form id="financeForm" class="form-grid">
+        <input type="hidden" name="id" />
+        <label>Date<input required type="date" name="date" value="2026-06-10" /></label>
+        <label>Branch<select required name="branch" id="financeEntryBranch"></select></label>
+        <label>Type<select required name="type"><option>Income</option><option>Expense</option></select></label>
+        <label>Category<select required name="category" id="financeEntryCategory"></select></label>
+        <label>Amount (OMR)<input required min="0.001" step="0.001" type="number" name="amount" /></label>
+        <label>Payment Method<select name="payment_method"><option>Visa</option><option>Online</option><option>Cash</option><option>Bank</option><option>Other</option></select></label>
+        <label>Reference<input name="reference" placeholder="Invoice or reference number" /></label>
+        <label>Description<input required name="description" /></label>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="financeModal">Cancel</button><button type="submit" class="primary-btn">Save Entry</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="budgetCategoryModal">
+    <div class="modal-card large-modal">
+      <div class="modal-head"><div><span class="eyebrow">EXPENSE MASTER</span><h3>Manage Expense Categories</h3></div><button class="icon-btn" data-close="budgetCategoryModal">×</button></div>
+      <form id="budgetCategoryForm" class="form-grid budget-category-form">
+        <input type="hidden" name="id" />
+        <label>Category Name<input required name="name" placeholder="Example: Staff Accommodation" /></label>
+        <label>Default Warning Limit (%)<input required min="1" max="100" step="1" type="number" name="default_warning_percent" value="80" /></label>
+        <label class="checkbox-row span-2"><input type="checkbox" name="active" checked /> Active category</label>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" id="clearBudgetCategoryForm">Clear</button><button type="submit" class="primary-btn">Save Category</button></div>
+      </form>
+      <div class="table-wrap"><table><thead><tr><th>Category</th><th>Default Alert</th><th>Status</th><th>Action</th></tr></thead><tbody id="budgetCategoryTableBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="modal" id="historyModal">
+    <div class="modal-card large-modal">
+      <div class="modal-head"><div><span class="eyebrow">PREVIOUS MONTHS</span><h3 id="historyTitle">Employee Production History</h3></div><button class="icon-btn" data-close="historyModal">×</button></div>
+      <div class="table-wrap"><table><thead><tr><th>Month</th><th>Activity Breakdown</th><th>Total Qty</th><th>Total Pcs Produced</th><th>OT Hours</th></tr></thead><tbody id="historyTableBody"></tbody></table></div>
+    </div>
+  </div>
+
+  <div class="modal" id="posImportModal">
+    <div class="modal-card extra-large-modal">
+      <div class="modal-head"><div><span class="eyebrow">CSV & EXCEL SALES IMPORT</span><h3>Import Sales & Customer Details</h3></div><button class="icon-btn" data-close="posImportModal">×</button></div>
+      <form id="posImportForm" class="form-grid">
+        <label class="span-2">Sales Export File<input required id="posSalesFile" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" /><small id="posFileStatus">Choose a CSV or Excel XLSX file. Preview is optional; you can import directly.</small></label>
+        <label>Branch Detection<select name="branch_override" id="posImportBranchOverride"><option>Auto Detect</option></select><small>Auto Detect uses Location and invoice prefix.</small></label>
+        <label>Financial Posting Basis<select name="revenue_basis"><option>Total Amount</option><option>Total Paid</option></select><small>Total Amount = sales revenue; Total Paid = cash collected.</small></label>
+        <label class="checkbox-row"><input type="checkbox" name="post_to_finance" checked /> Post imported invoices to Financials</label>
+        <label class="checkbox-row"><input type="checkbox" name="update_existing" checked /> Update existing invoices when payment/due changes</label>
+        <div class="pos-import-note span-2"><strong>Duplicate protection:</strong> Invoice No. is the unique key. Re-importing the same month updates Paid, Due and Payment Status instead of creating duplicate sales.</div>
+        <div class="form-actions span-2 pos-preview-actions"><button type="button" class="secondary-btn" data-close="posImportModal">Cancel</button><button type="button" class="secondary-btn" id="previewPosImportBtn">Preview File</button><button type="submit" class="primary-btn" id="confirmPosImportBtn">Import Sales</button></div>
+      </form>
+      <div id="posImportPreview" class="pos-import-preview hidden">
+        <div class="kpi-grid compact-kpis" id="posPreviewKpis"></div>
+        <div class="pos-preview-meta" id="posPreviewMeta"></div>
+        <div class="table-wrap"><table class="wide-table"><thead><tr><th>Date</th><th>Invoice</th><th>Customer</th><th>Phone</th><th>Branch</th><th>Status</th><th>Total</th><th>Paid</th><th>Due</th><th>Items</th></tr></thead><tbody id="posPreviewBody"></tbody></table></div>
+        <div class="import-errors hidden" id="posImportErrors"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="employeeModal">
+    <div class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow">EMPLOYEE MANAGEMENT</span><h3 id="employeeModalTitle">Add Employee</h3></div><button class="icon-btn" data-close="employeeModal">×</button></div>
+      <form id="employeeForm" class="form-grid">
+        <input type="hidden" name="id" />
+        <label>Employee Name<input required name="name" placeholder="Example: Asad" /></label>
+        <label>Branch<select required name="branch" id="employeeBranchSelect"></select></label>
+        <label class="span-2">Designation<input required name="role" placeholder="Example: Body Maker or Master Cutter" /></label>
+        <label>Daily Target<input required min="0" step="1" type="number" name="daily_target" value="0" /></label>
+        <label>Monthly Target<input required min="0" step="1" type="number" name="monthly_target" value="0" /></label>
+        <label class="span-2">Basic Monthly Salary (OMR)<input required min="0" step="0.001" type="number" name="base_salary" value="0" /><small>Enter once; it remains editable later.</small></label>
+        <fieldset class="category-fieldset span-2">
+          <legend>Work Categories — optional for sales/admin staff</legend>
+          <div class="category-selector" id="employeeCategorySelector">
+            <label><input type="checkbox" value="Body" /> Body</label>
+            <label><input type="checkbox" value="Joint/Side" /> Joint/Side</label>
+            <label><input type="checkbox" value="Daraz" /> Daraz</label>
+            <label><input type="checkbox" value="VIP Design" /> VIP Design</label>
+            <label><input type="checkbox" value="Button" /> Button</label>
+            <label><input type="checkbox" value="Alteration" /> Alteration</label>
+            <label><input type="checkbox" value="Cutting" /> Cutting</label>
+            <label><input type="checkbox" value="Iron" /> Iron</label>
+            <label><input type="checkbox" value="Sample" /> Sample</label>
+          </div>
+        </fieldset>
+        <p class="muted-note span-2">For a Sales Agent or office employee, leave all production categories unchecked. Only employees with production categories appear in production entry lists.</p>
+        <label class="checkbox-row span-2"><input type="checkbox" name="active" checked /> Active employee</label>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="employeeModal">Cancel</button><button type="submit" class="primary-btn">Save Employee</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="userModal">
+    <div class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow">USER ACCOUNT</span><h3 id="userModalTitle">Create User</h3></div><button class="icon-btn" data-close="userModal">×</button></div>
+      <form id="userForm" class="form-grid">
+        <input type="hidden" name="id" />
+        <label>Username<input required name="username" /></label>
+        <label>Full Name<input required name="full_name" /></label>
+        <label>Role<select required name="role" id="userRoleSelect"></select></label>
+        <label>Branch<select required name="branch" id="userBranchSelect"></select></label>
+        <label class="span-2">Password<input type="password" name="password" placeholder="Minimum 8 characters" /></label>
+        <label class="checkbox-row span-2"><input type="checkbox" name="active" checked /> Active account</label>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="userModal">Cancel</button><button type="submit" class="primary-btn">Save User</button></div>
+      </form>
+    </div>
+  </div>
+
+
+  <div class="modal" id="roleModal">
+    <div class="modal-card large-modal">
+      <div class="modal-head"><div><span class="eyebrow">ROLE & PERMISSION CONTROL</span><h3 id="roleModalTitle">Add Role</h3></div><button class="icon-btn" data-close="roleModal">×</button></div>
+      <form id="roleForm" class="form-grid">
+        <input type="hidden" name="id" />
+        <label>Role Name<input required name="name" placeholder="Example: Branch Manager" /></label>
+        <label class="checkbox-row"><input type="checkbox" name="active" checked /> Active role</label>
+        <label class="span-2">Description<input name="description" placeholder="What this role is responsible for" /></label>
+        <fieldset class="category-fieldset span-2"><legend>Permissions</legend><div class="permission-selector" id="rolePermissionSelector"></div></fieldset>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="roleModal">Cancel</button><button type="submit" class="primary-btn">Save Role & Permissions</button></div>
+      </form>
+    </div>
+  </div>
+
+
+  <div class="modal" id="payrollModal">
+    <div class="modal-card large-modal">
+      <div class="modal-head"><div><span class="eyebrow">MONTHLY PAYROLL</span><h3 id="payrollModalTitle">Edit Employee Payroll</h3></div><button class="icon-btn" data-close="payrollModal">×</button></div>
+      <form id="payrollForm" class="form-grid">
+        <input type="hidden" name="employee_id" /><input type="hidden" name="month_key" />
+        <label class="span-2">Employee<input name="employee_name" readonly /></label>
+        <label>Basic Salary (OMR)<input required min="0" step="0.001" type="number" name="basic_salary" /></label>
+        <label>Card Commission Reference<input readonly type="number" step="0.001" name="card_commission_auto" /></label>
+        <label>Monthly Commission (OMR)<input required min="0" step="0.001" type="number" name="commission" /></label>
+        <label>Bonus (OMR)<input required min="0" step="0.001" type="number" name="bonus" /></label>
+        <label>Overtime Hours<input required min="0" step="0.5" type="number" name="overtime_hours" /></label>
+        <label>Overtime Amount (OMR)<input required min="0" step="0.001" type="number" name="overtime_amount" /></label>
+        <label>Other Allowance (OMR)<input required min="0" step="0.001" type="number" name="other_allowance" /></label>
+        <label>Advance Deduction (OMR)<input required min="0" step="0.001" type="number" name="advance_deduction" /></label>
+        <label>Other Deductions (OMR)<input required min="0" step="0.001" type="number" name="other_deductions" /></label>
+        <label>Status<select name="status"><option>Draft</option><option>Approved</option><option>Paid</option></select></label>
+        <label class="span-2">Notes<input name="notes" placeholder="Optional salary notes" /></label>
+        <div class="salary-preview span-2"><span>Calculated Net Salary</span><strong id="payrollNetPreview">OMR 0.000</strong></div>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="payrollModal">Cancel</button><button type="submit" class="primary-btn">Save Payroll</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="modal" id="attendanceModal">
+    <div class="modal-card">
+      <div class="modal-head"><div><span class="eyebrow">ATTENDANCE ENTRY</span><h3>Record Attendance</h3></div><button class="icon-btn" data-close="attendanceModal">×</button></div>
+      <form id="attendanceForm" class="form-grid">
+        <label>Date<input required type="date" name="date" value="2026-06-10" /></label>
+        <label>Branch<select required name="branch" id="attendanceBranchSelect"></select></label>
+        <label class="span-2">Employee<select required name="employee_id" id="attendanceEmployeeSelect"></select></label>
+        <label>Status<select required name="status" id="attendanceStatusSelect"></select></label>
+        <label>Notes<input name="notes" /></label>
+        <div class="form-actions span-2"><button type="button" class="secondary-btn" data-close="attendanceModal">Cancel</button><button type="submit" class="primary-btn">Save Attendance</button></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="confirm-modal" id="confirmModal"><div class="confirm-card"><h3 id="confirmTitle">Confirm action</h3><p id="confirmMessage"></p><div><button class="secondary-btn" id="confirmCancel">Cancel</button><button class="danger-btn" id="confirmOk">Delete</button></div></div></div>
+  <div class="toast" id="toast"></div>
+  <script src="app.js?v=3.4-luxury-3d"></script>
+  <script>if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));</script>
+</body>
+</html>
