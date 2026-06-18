@@ -232,3 +232,20 @@ select option[selected]{background:#1d2940;color:#fff}
 /* Chrome/Blink hover highlight for option items. */
 select option:hover,
 select option:focus{background:#243450;color:#fff}
+
+/* ===== Settings module: tabs, company profile, owner settings ===== */
+.settings-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:2px}
+.settings-tab{border:1px solid transparent;background:transparent;color:var(--muted);padding:10px 16px;border-radius:10px 10px 0 0;font-weight:600;font-size:13px;transition:.2s}
+.settings-tab:hover{color:var(--text);background:rgba(255,255,255,.03)}
+.settings-tab.active{color:var(--gold2);background:linear-gradient(180deg,rgba(213,179,107,.16),rgba(213,179,107,.04));border-color:rgba(213,179,107,.2);border-bottom-color:transparent}
+.settings-panelgroup{display:none}
+.settings-panelgroup.active{display:block}
+.logo-upload-row{display:flex;gap:20px;align-items:center;flex-wrap:wrap;padding:6px 0}
+.logo-preview{width:120px;height:120px;border:1px solid var(--border);border-radius:14px;background:rgba(255,255,255,.03);display:grid;place-items:center;overflow:hidden;flex-shrink:0}
+.logo-preview img{max-width:100%;max-height:100%;object-fit:contain}
+.logo-upload-actions{display:flex;flex-direction:column;gap:8px;min-width:220px}
+.logo-file-label{font-size:11px;color:var(--muted);display:grid;gap:7px}
+.branch-status-pill{display:inline-flex;padding:5px 9px;border-radius:99px;font-size:10px;border:1px solid var(--border)}
+.branch-status-pill.on{color:var(--green)}
+.branch-status-pill.off{color:var(--muted)}
+[dir="rtl"] .settings-tab{border-radius:10px 10px 0 0}

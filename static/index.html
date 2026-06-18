@@ -8,8 +8,8 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=3.5-i18n" />
-  <script src="i18n.js?v=3.5-i18n"></script>
+  <link rel="stylesheet" href="styles.css?v=3.6-company" />
+  <script src="i18n.js?v=3.6-company"></script>
 </head>
 <body>
   <div class="cloud-demo-banner" id="cloudDemoBanner">CLOUD DEMO · SAMPLE DATA · OWNER PRESENTATION VERSION</div>
@@ -512,8 +512,14 @@
       </section>
 
       <section class="page" id="settings">
-        <div class="section-heading"><div><span class="eyebrow">APPLICATION PREFERENCES</span><h3>Language &amp; Region</h3></div></div>
-        <div class="dashboard-grid settings-grid">
+        <div class="section-heading"><div><span class="eyebrow">APPLICATION PREFERENCES</span><h3>Settings</h3></div></div>
+        <div class="settings-tabs" id="settingsTabs">
+          <button class="settings-tab active" data-settings-tab="preferences">Preferences</button>
+          <button class="settings-tab" data-settings-tab="companyProfile" data-permission="company_settings_read">Company Profile</button>
+          <button class="settings-tab" data-settings-tab="ownerSettings" data-permission="company_settings_read">Owner Settings</button>
+        </div>
+
+        <div class="settings-panelgroup active" data-settings-content="preferences">
           <article class="panel">
             <div class="panel-head"><div><span class="eyebrow">INTERFACE LANGUAGE</span><h3>Your Language</h3></div></div>
             <p class="muted-note">Choose the language for your own account. The change applies immediately.</p>
@@ -521,13 +527,69 @@
               <label>Interface Language<select id="uiLanguageSelect" data-i18n-switch class="control"><option value="en">English</option><option value="ar">العربية</option></select></label>
             </form>
           </article>
-          <article class="panel" data-permission="users">
-            <div class="panel-head"><div><span class="eyebrow">COMPANY DEFAULT</span><h3>Company Default Language</h3></div></div>
+        </div>
+
+        <div class="settings-panelgroup" data-settings-content="companyProfile" data-permission="company_settings_read">
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">COMPANY IDENTITY</span><h3>Company Profile</h3></div></div>
+            <p class="muted-note">These details and the logo brand the dashboard. Future clients can re-brand here without any code change.</p>
+            <form id="companyProfileForm" class="form-grid">
+              <label>Company Name<input name="company_name" required /></label>
+              <label>VAT Number<input name="company_vat" /></label>
+              <label>Phone Number<input name="company_phone" /></label>
+              <label>Email Address<input type="email" name="company_email" /></label>
+              <label>Website<input name="company_website" /></label>
+              <label>&nbsp;<span class="muted-note">Used on the dashboard header and sign-in screen.</span></label>
+              <label class="span-2">Company Address<input name="company_address" /></label>
+              <div class="span-2 logo-upload-row">
+                <div class="logo-preview"><img id="companyLogoPreview" src="/api/company/logo" alt="Company logo" /></div>
+                <div class="logo-upload-actions company-settings-write">
+                  <label class="logo-file-label">Company Logo<input type="file" id="companyLogoInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" /></label>
+                  <small class="muted-note">PNG, JPG, WEBP or SVG, up to 2 MB.</small>
+                  <button type="button" class="secondary-btn" id="removeCompanyLogoBtn">Reset to Default Logo</button>
+                </div>
+              </div>
+              <div class="form-actions span-2 company-settings-write"><button type="submit" class="primary-btn">Save Company Profile</button></div>
+            </form>
+          </article>
+        </div>
+
+        <div class="settings-panelgroup" data-settings-content="ownerSettings" data-permission="company_settings_read">
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">LANGUAGE</span><h3>Company Default Language</h3></div></div>
             <p class="muted-note">New users and the sign-in screen use this language until a user chooses their own.</p>
-            <form id="companyLanguageForm" class="settings-form">
+            <form id="companyLanguageForm" class="settings-form company-settings-write">
               <label>Company Default Language<select id="companyDefaultLanguage" class="control"><option value="en">English</option><option value="ar">العربية</option></select></label>
               <button class="primary-btn full" type="submit">Save Company Default</button>
             </form>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">BRANCH MANAGEMENT</span><h3>Branches</h3></div></div>
+            <form id="branchForm" class="filter-bar company-settings-write">
+              <input type="hidden" name="id" />
+              <input class="control" name="name" placeholder="Branch name" autocomplete="off" />
+              <button class="primary-btn" type="submit" id="branchSubmitBtn">Add Branch</button>
+              <button class="secondary-btn" type="button" id="branchCancelEdit" hidden>Cancel</button>
+            </form>
+            <div class="table-wrap"><table><thead><tr><th>Branch</th><th>Employees</th><th>Status</th><th class="company-settings-write">Actions</th></tr></thead><tbody id="branchManageBody"></tbody></table></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">EMPLOYEE MANAGEMENT</span><h3>Employees</h3></div><span class="muted-note">Edit details and assign branch.</span></div>
+            <div class="table-wrap"><table class="wide-table"><thead><tr><th>Employee</th><th>Designation</th><th>Branch</th><th>Daily Target</th><th>Monthly Target</th><th>Status</th><th class="company-settings-write">Actions</th></tr></thead><tbody id="employeeManageBody"></tbody></table></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head"><div><span class="eyebrow">TARGETS MANAGEMENT</span><h3>Company Targets</h3></div></div>
+            <p class="muted-note">Company-level monthly targets for owner reference. Branch and category budgets remain in the Budgets module.</p>
+            <form id="companyTargetsForm" class="form-grid">
+              <label>Monthly Production Target (pcs)<input type="number" min="0" step="1" name="monthly_production_target" class="control" /></label>
+              <label>Monthly Income Target (OMR)<input type="number" min="0" step="0.001" name="monthly_income_target" class="control" /></label>
+              <div class="form-actions span-2 company-settings-write"><button class="primary-btn" type="submit">Save Targets</button></div>
+            </form>
+            <div class="panel-head"><div><span class="eyebrow">EMPLOYEE TARGETS</span><h3>Per-Employee Targets</h3></div></div>
+            <div class="table-wrap"><table class="wide-table"><thead><tr><th>Employee</th><th>Branch</th><th>Daily Target</th><th>Monthly Target</th><th class="company-settings-write">Actions</th></tr></thead><tbody id="employeeTargetsBody"></tbody></table></div>
           </article>
         </div>
       </section>
@@ -860,7 +922,7 @@
 
   <div class="confirm-modal" id="confirmModal"><div class="confirm-card"><h3 id="confirmTitle">Confirm action</h3><p id="confirmMessage"></p><div><button class="secondary-btn" id="confirmCancel">Cancel</button><button class="danger-btn" id="confirmOk">Delete</button></div></div></div>
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=3.5-i18n"></script>
+  <script src="app.js?v=3.6-company"></script>
   <script>if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));</script>
 </body>
 </html>

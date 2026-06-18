@@ -13,12 +13,57 @@ $('logoutBtn').addEventListener('click',async()=>{try{await api('/api/logout',{m
 
 /* ---- Language / i18n integration (Phase 3.5) ---- */
 function syncLanguageControls(){const l=window.I18N?I18N.getLanguage():'en';document.querySelectorAll('[data-i18n-switch]').forEach(s=>{if(s.value!==l)s.value=l})}
-async function bootstrapLanguage(){if(!window.I18N)return;I18N.init({fallback:'en'});syncLanguageControls();if(I18N.storedLanguage()==null){try{const h=await api('/api/health');if(h&&h.default_language)I18N.setLanguage(h.default_language,{persistLocal:false});}catch(e){}}I18N.onChange(()=>syncLanguageControls());}
+async function bootstrapLanguage(){if(window.I18N){I18N.init({fallback:'en'});syncLanguageControls();I18N.onChange(()=>syncLanguageControls());}try{const h=await api('/api/health');if(h){applyCompanyBranding(h);if(window.I18N&&I18N.storedLanguage()==null&&h.default_language)I18N.setLanguage(h.default_language,{persistLocal:false});}}catch(e){}}
+function applyCompanyBranding(info){info=info||{};const name=(info.company_name||'').trim();if(name){const h1=document.querySelector('.sidebar .brand h1');if(h1)h1.textContent=name;document.title=name+' — CFO & Production';}const v=info.company_logo_updated||Date.now();const src='/api/company/logo?v='+encodeURIComponent(v);document.querySelectorAll('.brand-logo,.topbar-logo').forEach(img=>{img.src=src;});}
 function applyUserLanguage(){if(!window.I18N||!state.user)return;I18N.setLanguage(state.user.language||I18N.getLanguage(),{persistLocal:true});}
 async function persistUserLanguage(lang){if(!state.user)return;try{await api('/api/me/language',{method:'POST',body:{language:lang}});state.user.language=lang;}catch(e){}}
 document.addEventListener('change',e=>{const el=e.target.closest&&e.target.closest('[data-i18n-switch]');if(!el||!window.I18N)return;const lang=el.value;I18N.setLanguage(lang,{persistLocal:true});persistUserLanguage(lang);});
-async function loadSettings(){if(!window.I18N)return;syncLanguageControls();try{const d=await api('/api/settings');const sel=$('companyDefaultLanguage');if(sel&&d&&d.default_language)sel.value=d.default_language;}catch(e){}}
+/* ---- Settings module: tabs, company profile, owner settings (Phase 3.6) ---- */
+let _settingsTabsReady=false;
+function setupSettingsTabs(){
+  if(_settingsTabsReady)return;_settingsTabsReady=true;
+  document.querySelectorAll('#settingsTabs .settings-tab').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      document.querySelectorAll('#settingsTabs .settings-tab').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.settings-panelgroup').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      const panel=document.querySelector(`.settings-panelgroup[data-settings-content="${btn.dataset.settingsTab}"]`);
+      if(panel)panel.classList.add('active');
+    });
+  });
+}
+async function loadSettings(){
+  if(window.I18N)syncLanguageControls();
+  setupSettingsTabs();
+  try{const d=await api('/api/settings');const sel=$('companyDefaultLanguage');if(sel&&d&&d.default_language)sel.value=d.default_language;}catch(e){}
+  if(has('company_settings_read')){
+    await Promise.all([loadCompanyProfile(),loadBranchManagement(),loadCompanyTargets()]);
+    renderOwnerSettingsTables();
+  }
+}
+/* Company default language */
 {const cf=$('companyLanguageForm');if(cf)cf.addEventListener('submit',async e=>{e.preventDefault();const lang=$('companyDefaultLanguage').value;try{await api('/api/settings',{method:'POST',body:{default_language:lang}});toast('Company default language saved');}catch(err){toast(err.message,true);}});}
+/* Company profile */
+let _companyLogoData=null,_companyLogoMime=null,_companyLogoRemove=false;
+async function loadCompanyProfile(){try{const d=await api('/api/company/profile');const p=d.profile||{};const f=$('companyProfileForm');if(!f)return;f.elements.company_name.value=p.company_name||'';f.elements.company_vat.value=p.company_vat||'';f.elements.company_phone.value=p.company_phone||'';f.elements.company_email.value=p.company_email||'';f.elements.company_website.value=p.company_website||'';f.elements.company_address.value=p.company_address||'';_companyLogoData=null;_companyLogoMime=null;_companyLogoRemove=false;const img=$('companyLogoPreview');if(img)img.src='/api/company/logo?v='+encodeURIComponent(p.company_logo_updated||Date.now());}catch(e){}}
+{const li=$('companyLogoInput');if(li)li.addEventListener('change',e=>{const file=e.target.files&&e.target.files[0];if(!file)return;if(file.size>2*1024*1024){toast('Logo must be 2 MB or smaller',true);li.value='';return;}const reader=new FileReader();reader.onload=()=>{_companyLogoData=reader.result;_companyLogoMime=file.type;_companyLogoRemove=false;const img=$('companyLogoPreview');if(img)img.src=reader.result;};reader.readAsDataURL(file);});}
+{const rb=$('removeCompanyLogoBtn');if(rb)rb.addEventListener('click',()=>{_companyLogoData=null;_companyLogoMime=null;_companyLogoRemove=true;const img=$('companyLogoPreview');if(img)img.src='/api/company/logo?v='+Date.now();const li=$('companyLogoInput');if(li)li.value='';toast('Logo will reset to default on save');});}
+{const cpf=$('companyProfileForm');if(cpf)cpf.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);const body={company_name:f.get('company_name'),company_vat:f.get('company_vat'),company_phone:f.get('company_phone'),company_email:f.get('company_email'),company_website:f.get('company_website'),company_address:f.get('company_address')};if(_companyLogoRemove)body.remove_logo=true;else if(_companyLogoData){body.logo_data=_companyLogoData;body.logo_mime=_companyLogoMime;}try{const d=await api('/api/company/profile',{method:'POST',body});toast('Company profile saved');_companyLogoData=null;_companyLogoRemove=false;const li=$('companyLogoInput');if(li)li.value='';if(d.profile)applyCompanyBranding(d.profile);}catch(err){toast(err.message,true);}});}
+/* Branch management */
+function renderBranchManagement(){const body=$('branchManageBody');if(!body)return;const canWrite=has('company_settings_write');body.innerHTML=(state._manageBranches||[]).map(b=>`<tr><td><strong>${esc(b.name)}</strong></td><td>${b.employee_count}</td><td><span class="branch-status-pill ${b.active?'on':'off'}">${b.active?'Active':'Disabled'}</span></td>${canWrite?`<td><button class="action-btn" onclick="settingsEditBranch(${b.id})">Edit</button> <button class="action-btn" onclick="settingsToggleBranch(${b.id})">${b.active?'Disable':'Enable'}</button></td>`:''}</tr>`).join('');}
+async function loadBranchManagement(){try{const d=await api('/api/branches/manage');state._manageBranches=d.branches||[];renderBranchManagement();}catch(e){}}
+function resetBranchForm(){const f=$('branchForm');if(!f)return;f.reset();f.elements.id.value='';const sb=$('branchSubmitBtn');if(sb)sb.textContent='Add Branch';const c=$('branchCancelEdit');if(c)c.hidden=true;}
+window.settingsEditBranch=id=>{const b=(state._manageBranches||[]).find(x=>x.id===id);if(!b)return;const f=$('branchForm');f.elements.id.value=b.id;f.elements.name.value=b.name;$('branchSubmitBtn').textContent='Save Branch';$('branchCancelEdit').hidden=false;};
+window.settingsToggleBranch=async id=>{const b=(state._manageBranches||[]).find(x=>x.id===id);if(!b)return;try{await api(`/api/branches/manage/${id}`,{method:'PUT',body:{active:b.active?0:1}});toast('Branch updated');await loadBranchManagement();await loadReferenceData();}catch(err){toast(err.message,true);}};
+{const bf=$('branchForm');if(bf)bf.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target),id=f.get('id'),name=(f.get('name')||'').trim();if(!name){toast('Branch name is required',true);return;}try{await api(id?`/api/branches/manage/${id}`:'/api/branches/manage',{method:id?'PUT':'POST',body:{name}});toast(id?'Branch updated':'Branch added');resetBranchForm();await loadBranchManagement();await loadReferenceData();}catch(err){toast(err.message,true);}});}
+{const bc=$('branchCancelEdit');if(bc)bc.addEventListener('click',resetBranchForm);}
+/* Employee management + targets (reuse existing employee endpoints/modal) */
+function renderOwnerSettingsTables(){renderOwnerEmployees();renderOwnerTargets();}
+window.renderOwnerSettingsTables=renderOwnerSettingsTables;
+function renderOwnerEmployees(){const body=$('employeeManageBody');if(!body)return;const canWrite=has('company_settings_write')&&has('employee_write');body.innerHTML=(state.employees||[]).map(e=>`<tr><td><strong>${esc(e.name)}</strong></td><td>${esc(e.role)}</td><td>${esc(e.branch)}</td><td>${e.daily_target}</td><td>${e.monthly_target}</td><td><span class="status-badge ${e.active?'active':'inactive'}">${e.active?'Active':'Inactive'}</span></td>${canWrite?`<td><button class="action-btn" onclick="editEmployee(${e.id})">Edit</button></td>`:''}</tr>`).join('');}
+function renderOwnerTargets(){const body=$('employeeTargetsBody');if(!body)return;const canWrite=has('company_settings_write')&&has('employee_write');body.innerHTML=(state.employees||[]).map(e=>`<tr><td><strong>${esc(e.name)}</strong></td><td>${esc(e.branch)}</td><td>${e.daily_target}</td><td>${e.monthly_target}</td>${canWrite?`<td><button class="action-btn" onclick="editEmployee(${e.id})">Edit Targets</button></td>`:''}</tr>`).join('');}
+async function loadCompanyTargets(){try{const d=await api('/api/company/targets');const t=d.targets||{};const f=$('companyTargetsForm');if(!f)return;f.elements.monthly_production_target.value=t.monthly_production_target||0;f.elements.monthly_income_target.value=t.monthly_income_target||0;}catch(e){}}
+{const tf=$('companyTargetsForm');if(tf)tf.addEventListener('submit',async e=>{e.preventDefault();const f=new FormData(e.target);try{await api('/api/company/targets',{method:'POST',body:{monthly_production_target:Number(f.get('monthly_production_target')||0),monthly_income_target:Number(f.get('monthly_income_target')||0)}});toast('Targets saved');}catch(err){toast(err.message,true);}});}
 bootstrapLanguage();
 
 async function initialize(user=null){try{if(!user){const d=await api('/api/me');user=d.user}state.user=user;state.permissions=new Set(user.permissions||[]);showApp();applyUserUI();applyUserLanguage();await loadReferenceData();await Promise.all([loadDashboard(),loadEmployees()]);if(has('orders_read'))await loadOrders();if(has('membership_read'))await loadMembership();if(has('production_read'))await loadProduction();if(has('finance_read')){await loadFinance();await loadPosSales()}if(has('alert_read'))await loadNotifications();setupNavigation()}catch(err){console.error(err);showLogin()}}
@@ -41,6 +86,7 @@ function applyUserUI(){const u=state.user;$('userFullName').textContent=u.full_n
  document.querySelectorAll('.employee-write').forEach(el=>el.classList.toggle('hidden',!has('employee_write')));
  document.querySelectorAll('.finance-report').forEach(el=>el.classList.toggle('hidden',!has('finance_read')));
  document.querySelectorAll('.backup-only').forEach(el=>el.classList.toggle('hidden',!has('backup')));
+ document.querySelectorAll('.company-settings-write').forEach(el=>el.classList.toggle('hidden',!has('company_settings_write')));
 }
 
 async function loadReferenceData(){const calls=[api('/api/branches'),api('/api/employees?branch=All')];if(has('budget_read'))calls.push(api('/api/budget/categories'));const results=await Promise.all(calls),b=results[0],e=results[1];state.branches=b.branches;state.activities=e.activities||[];state.employeeDirectory=e.employees;state.employees=e.employees;if(results[2])state.budget.categories=results[2].categories||[];fillBranchSelects();fillEmployeeSelects();fillFinanceCategoryOptions()}
@@ -196,7 +242,7 @@ function selectedEmployeeCategories(){return [...document.querySelectorAll('#emp
 function setEmployeeCategories(categories=[]){document.querySelectorAll('#employeeCategorySelector input').forEach(x=>x.checked=categories.includes(x.value))}
 $('addEmployeeBtn').onclick=()=>{const f=$('employeeForm');f.reset();f.elements.id.value='';f.elements.active.checked=true;f.elements.branch.value=state.user.branch==='All'?($('globalBranch').value==='All'?'Al Khoud':$('globalBranch').value):state.user.branch;setEmployeeCategories([]);$('employeeModalTitle').textContent='Add Employee';openModal('employeeModal')};
 window.editEmployee=id=>{const e=state.employees.find(x=>x.id===id);if(!e)return;const f=$('employeeForm');f.elements.id.value=e.id;f.elements.name.value=e.name;f.elements.branch.value=e.branch;f.elements.role.value=e.role;f.elements.daily_target.value=e.daily_target;f.elements.monthly_target.value=e.monthly_target;f.elements.base_salary.value=e.base_salary||0;f.elements.active.checked=!!e.active;setEmployeeCategories(e.categories||[]);$('employeeModalTitle').textContent='Edit Employee';openModal('employeeModal')};
-$('employeeForm').onsubmit=async ev=>{ev.preventDefault();const f=new FormData(ev.target),id=f.get('id'),categories=selectedEmployeeCategories();const body={name:f.get('name'),branch:f.get('branch'),role:f.get('role'),daily_target:Number(f.get('daily_target')),monthly_target:Number(f.get('monthly_target')),base_salary:Number(f.get('base_salary')||0),active:ev.target.elements.active.checked,categories};try{await api(id?`/api/employees/${id}`:'/api/employees',{method:id?'PUT':'POST',body});closeModal('employeeModal');await loadReferenceData();fillMembershipSalesAgents();await Promise.all([loadEmployees(),loadProduction(),loadDashboard()]);toast(id?'Employee updated':'Employee added')}catch(err){toast(err.message,true)}};
+$('employeeForm').onsubmit=async ev=>{ev.preventDefault();const f=new FormData(ev.target),id=f.get('id'),categories=selectedEmployeeCategories();const body={name:f.get('name'),branch:f.get('branch'),role:f.get('role'),daily_target:Number(f.get('daily_target')),monthly_target:Number(f.get('monthly_target')),base_salary:Number(f.get('base_salary')||0),active:ev.target.elements.active.checked,categories};try{await api(id?`/api/employees/${id}`:'/api/employees',{method:id?'PUT':'POST',body});closeModal('employeeModal');await loadReferenceData();fillMembershipSalesAgents();await Promise.all([loadEmployees(),loadProduction(),loadDashboard()]);if(window.renderOwnerSettingsTables)renderOwnerSettingsTables();toast(id?'Employee updated':'Employee added')}catch(err){toast(err.message,true)}};
 
 $('addFinanceBtn').onclick=()=>{const f=$('financeForm');f.reset();f.elements.id.value='';fillFinanceCategoryOptions('Income');f.elements.date.value='2026-06-10';f.elements.branch.value=state.user.branch==='All'?($('financeBranch').value==='All'?'Al Khoud':$('financeBranch').value):state.user.branch;$('financeModalTitle').textContent='Record Income or Expense';openModal('financeModal')};
 $('financeForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),id=f.get('id');const body={date:f.get('date'),branch:f.get('branch'),type:f.get('type'),category:f.get('category'),description:f.get('description'),amount:Number(f.get('amount')),payment_method:f.get('payment_method'),reference:f.get('reference')};try{await api(id?`/api/finance/${id}`:'/api/finance',{method:id?'PUT':'POST',body});closeModal('financeModal');await Promise.all([loadFinance(),loadDashboard()]);toast(id?'Financial entry updated':'Financial entry saved')}catch(err){toast(err.message,true)}};

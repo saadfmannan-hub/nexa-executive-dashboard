@@ -84,6 +84,8 @@ PERMISSION_CATALOG = {
     "audit": ("Administration", "View Audit Log", "View system activity and change history"),
     "users": ("Administration", "Manage Users & Roles", "Create users and configure role permissions"),
     "backup": ("Administration", "Database Backup", "Download a database backup"),
+    "company_settings_read": ("Company", "View Company Settings", "View company profile and owner settings"),
+    "company_settings_write": ("Company", "Manage Company Settings", "Edit company profile, branding, branches and owner settings"),
 }
 
 DEFAULT_ROLE_DEFINITIONS = {
@@ -97,7 +99,7 @@ DEFAULT_ROLE_DEFINITIONS = {
     },
     "Accountant": {
         "description": "Financials, budgets, payroll, membership, reports and attendance.",
-        "permissions": {"dashboard","alert_read","budget_read","budget_write","payroll_read","payroll_write","attendance_read","attendance_write","orders_read","orders_write","membership_read","membership_write","finance_read","finance_write","production_read","employees","reports","backup"},
+        "permissions": {"dashboard","alert_read","budget_read","budget_write","payroll_read","payroll_write","attendance_read","attendance_write","orders_read","orders_write","membership_read","membership_write","finance_read","finance_write","production_read","employees","reports","backup","company_settings_read"},
     },
     "Branch Manager": {
         "description": "Operational control for the assigned branch without user administration.",
@@ -160,6 +162,32 @@ def now_iso() -> str:
 SUPPORTED_LANGUAGES = ("en", "ar")
 DEFAULT_LANGUAGE = "en"
 
+# Company profile defaults — Dar al Sultan remains the active demo company.
+# Future clients override these values from Settings → Company Profile without
+# any code change.
+COMPANY_PROFILE_FIELDS = (
+    "company_name",
+    "company_address",
+    "company_phone",
+    "company_email",
+    "company_website",
+    "company_vat",
+)
+DEFAULT_COMPANY_PROFILE = {
+    "company_name": "Dar al Sultan",
+    "company_address": "",
+    "company_phone": "",
+    "company_email": "",
+    "company_website": "",
+    "company_vat": "",
+}
+# Owner-level informational targets (additive; do not feed existing calculations).
+OWNER_TARGET_FIELDS = ("monthly_production_target", "monthly_income_target")
+DEFAULT_OWNER_TARGETS = {
+    "monthly_production_target": "0",
+    "monthly_income_target": "0",
+}
+
 
 def normalize_language(value: Any, fallback: str = DEFAULT_LANGUAGE) -> str:
     code = str(value or "").strip().lower()
@@ -177,6 +205,24 @@ def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
         "ON CONFLICT(key) DO UPDATE SET value=excluded.value",
         (key, value),
     )
+
+
+def get_company_profile(conn: sqlite3.Connection) -> dict[str, str]:
+    profile = dict(DEFAULT_COMPANY_PROFILE)
+    for field in COMPANY_PROFILE_FIELDS:
+        profile[field] = get_setting(conn, field, DEFAULT_COMPANY_PROFILE[field])
+    if not str(profile["company_name"]).strip():
+        profile["company_name"] = DEFAULT_COMPANY_PROFILE["company_name"]
+    profile["company_logo_updated"] = get_setting(conn, "company_logo_updated", "")
+    profile["has_custom_logo"] = bool(get_setting(conn, "company_logo_data", ""))
+    return profile
+
+
+def get_owner_targets(conn: sqlite3.Connection) -> dict[str, str]:
+    targets = dict(DEFAULT_OWNER_TARGETS)
+    for field in OWNER_TARGET_FIELDS:
+        targets[field] = get_setting(conn, field, DEFAULT_OWNER_TARGETS[field])
+    return targets
 
 
 def month_name(month_key: str) -> str:
@@ -234,6 +280,31 @@ def migrate_schema(conn: sqlite3.Connection) -> None:
     ensure_column(conn, "membership_cards", "commission_amount", "REAL NOT NULL DEFAULT 0")
     # Phase 3.5: per-user interface language preference (en/ar).
     ensure_column(conn, "users", "language", "TEXT NOT NULL DEFAULT 'en'")
+    # Phase 3.6: grant Company Profile / Owner Settings permissions on existing,
+    # already-seeded databases (seed_data only seeds roles that have none).
+    grant_company_settings_permissions(conn)
+
+
+def grant_company_settings_permissions(conn: sqlite3.Connection) -> None:
+    """Idempotently grant the company-settings permissions to the right roles.
+
+    Owner and Administrator get full access (read + write); Accountant gets
+    read-only. Other roles are intentionally left without access. Uses
+    INSERT OR IGNORE so it is safe to run on every startup."""
+    grants = {
+        "Owner": ("company_settings_read", "company_settings_write"),
+        "Administrator": ("company_settings_read", "company_settings_write"),
+        "Accountant": ("company_settings_read",),
+    }
+    for role_name, permissions in grants.items():
+        role = conn.execute("SELECT id FROM roles WHERE name=?", (role_name,)).fetchone()
+        if not role:
+            continue
+        for permission in permissions:
+            conn.execute(
+                "INSERT OR IGNORE INTO role_permissions(role_id,permission) VALUES (?,?)",
+                (role["id"], permission),
+            )
     conn.execute("CREATE INDEX IF NOT EXISTS idx_membership_agent_issue ON membership_cards(sales_agent_id,issue_date)")
     conn.execute("""UPDATE membership_cards SET sales_agent_name=COALESCE((SELECT name FROM employees WHERE employees.id=membership_cards.sales_agent_id),'')
                     WHERE TRIM(COALESCE(sales_agent_name,''))='' AND sales_agent_id IS NOT NULL""")
@@ -697,6 +768,8 @@ def seed_data(conn: sqlite3.Connection) -> None:
         "INSERT OR IGNORE INTO app_settings(key,value) VALUES (?,?)",
         ("default_language", DEFAULT_LANGUAGE),
     )
+    for key, value in {**DEFAULT_COMPANY_PROFILE, **DEFAULT_OWNER_TARGETS}.items():
+        conn.execute("INSERT OR IGNORE INTO app_settings(key,value) VALUES (?,?)", (key, value))
     for branch in ("Al Khoud", "Azaiba", "Nizwa"):
         conn.execute("INSERT OR IGNORE INTO branches(name) VALUES (?)", (branch,))
 
@@ -1082,6 +1155,7 @@ class AppHandler(BaseHTTPRequestHandler):
             if path == "/api/health":
                 with db_connect() as conn:
                     default_language = normalize_language(get_setting(conn, "default_language", DEFAULT_LANGUAGE))
+                    profile = get_company_profile(conn)
                 self.send_json({
                     "ok": True,
                     "version": APP_VERSION,
@@ -1090,8 +1164,14 @@ class AppHandler(BaseHTTPRequestHandler):
                     "database": "SQLite demo" if DEMO_MODE else "SQLite local",
                     "default_language": default_language,
                     "supported_languages": list(SUPPORTED_LANGUAGES),
+                    "company_name": profile["company_name"],
+                    "company_logo_updated": profile["company_logo_updated"],
+                    "has_custom_logo": profile["has_custom_logo"],
                     "time": now_iso(),
                 })
+                return
+            if path == "/api/company/logo":
+                self.handle_company_logo()
                 return
             user = self.require_user()
             if not user:
@@ -1103,6 +1183,12 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True, "user": safe})
             elif path == "/api/settings":
                 self.handle_settings_get(user)
+            elif path == "/api/company/profile":
+                self.handle_company_profile_get(user)
+            elif path == "/api/company/targets":
+                self.handle_company_targets_get(user)
+            elif path == "/api/branches/manage":
+                self.handle_branches_manage_get(user)
             elif path == "/api/branches":
                 with db_connect() as conn:
                     branches = [dict(r) for r in conn.execute("SELECT id,name FROM branches WHERE active=1 ORDER BY id")]
@@ -1194,6 +1280,12 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.handle_user_language_save(user)
             elif path == "/api/settings":
                 self.handle_settings_save(user)
+            elif path == "/api/company/profile":
+                self.handle_company_profile_save(user)
+            elif path == "/api/company/targets":
+                self.handle_company_targets_save(user)
+            elif path == "/api/branches/manage":
+                self.handle_branch_create(user)
             elif path == "/api/notifications/read":
                 self.handle_notification_read(user)
             elif path == "/api/notifications/settings":
@@ -1252,7 +1344,9 @@ class AppHandler(BaseHTTPRequestHandler):
             user = self.require_user()
             if not user:
                 return
-            if path.startswith("/api/budget/categories/"):
+            if path.startswith("/api/branches/manage/"):
+                self.handle_branch_update(user, int(path.rsplit("/",1)[1]))
+            elif path.startswith("/api/budget/categories/"):
                 self.handle_budget_category_update(user, int(path.rsplit("/",1)[1]))
             elif path.startswith("/api/production/"):
                 self.handle_production_update(user, int(path.rsplit("/",1)[1]))
@@ -1369,6 +1463,185 @@ class AppHandler(BaseHTTPRequestHandler):
             set_setting(conn, "default_language", language)
             log_audit(conn, user, "UPDATE", "Settings", "default_language", f"Set company default language to {language}")
         self.send_json({"ok": True, "default_language": language})
+
+    # ---- Company Profile & Owner Settings (Phase 3.6) ----
+    LOGO_MIME_EXT = {
+        "image/png": "png", "image/jpeg": "jpg", "image/jpg": "jpg",
+        "image/webp": "webp", "image/svg+xml": "svg",
+    }
+    MAX_LOGO_BYTES = 2 * 1024 * 1024
+
+    def handle_company_logo(self) -> None:
+        """Public: serve the active company logo, falling back to the bundled
+        Dar al Sultan logo when no custom logo has been uploaded."""
+        with db_connect() as conn:
+            data_b64 = get_setting(conn, "company_logo_data", "")
+            mime = get_setting(conn, "company_logo_mime", "")
+        if data_b64:
+            try:
+                content = base64.b64decode(data_b64)
+            except Exception:
+                content = b""
+            if content:
+                self.send_response(200)
+                self.send_header("Content-Type", mime or "image/png")
+                self.send_header("Content-Length", str(len(content)))
+                self.send_header("Cache-Control", "no-cache")
+                self.end_headers()
+                self.wfile.write(content)
+                return
+        # Fallback to the default Dar al Sultan logo.
+        default_logo = STATIC_DIR / "dar-al-sultan-logo.png"
+        if default_logo.exists():
+            content = default_logo.read_bytes()
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(len(content)))
+            self.send_header("Cache-Control", "no-cache")
+            self.end_headers()
+            self.wfile.write(content)
+        else:
+            self.send_error(404)
+
+    def handle_company_profile_get(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "company_settings_read"):
+            return
+        with db_connect() as conn:
+            profile = get_company_profile(conn)
+        profile["can_manage"] = self.has_permission(user, "company_settings_write")
+        self.send_json({"ok": True, "profile": profile})
+
+    def handle_company_profile_save(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "company_settings_write"):
+            return
+        data = self.parse_json()
+        name = str(data.get("company_name", "")).strip()
+        if not name:
+            raise ValueError("Company name is required")
+        values = {
+            "company_name": name,
+            "company_address": str(data.get("company_address", "")).strip(),
+            "company_phone": str(data.get("company_phone", "")).strip(),
+            "company_email": str(data.get("company_email", "")).strip(),
+            "company_website": str(data.get("company_website", "")).strip(),
+            "company_vat": str(data.get("company_vat", "")).strip(),
+        }
+        logo_data = data.get("logo_data")
+        logo_mime = str(data.get("logo_mime", "")).strip().lower()
+        remove_logo = bool(data.get("remove_logo"))
+        with db_connect() as conn:
+            for key, value in values.items():
+                set_setting(conn, key, value)
+            if remove_logo:
+                set_setting(conn, "company_logo_data", "")
+                set_setting(conn, "company_logo_mime", "")
+                set_setting(conn, "company_logo_updated", now_iso())
+            elif logo_data:
+                raw = str(logo_data)
+                if "," in raw and raw.strip().lower().startswith("data:"):
+                    header, raw = raw.split(",", 1)
+                    if not logo_mime and ":" in header and ";" in header:
+                        logo_mime = header.split(":", 1)[1].split(";", 1)[0].strip().lower()
+                try:
+                    decoded = base64.b64decode(raw)
+                except Exception:
+                    raise ValueError("Logo file could not be read")
+                if len(decoded) > self.MAX_LOGO_BYTES:
+                    raise ValueError("Logo must be 2 MB or smaller")
+                if logo_mime not in self.LOGO_MIME_EXT:
+                    raise ValueError("Logo must be a PNG, JPG, WEBP or SVG image")
+                set_setting(conn, "company_logo_data", base64.b64encode(decoded).decode("ascii"))
+                set_setting(conn, "company_logo_mime", logo_mime)
+                set_setting(conn, "company_logo_updated", now_iso())
+            profile = get_company_profile(conn)
+            log_audit(conn, user, "UPDATE", "Company", "profile", f"Updated company profile ({name})")
+        profile["can_manage"] = True
+        self.send_json({"ok": True, "profile": profile})
+
+    def handle_company_targets_get(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "company_settings_read"):
+            return
+        with db_connect() as conn:
+            targets = get_owner_targets(conn)
+        targets["can_manage"] = self.has_permission(user, "company_settings_write")
+        self.send_json({"ok": True, "targets": targets})
+
+    def handle_company_targets_save(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "company_settings_write"):
+            return
+        data = self.parse_json()
+        saved = {}
+        with db_connect() as conn:
+            for field in OWNER_TARGET_FIELDS:
+                value = float(data.get(field, 0) or 0)
+                if value < 0:
+                    raise ValueError("Targets cannot be negative")
+                set_setting(conn, field, str(value))
+                saved[field] = str(value)
+            log_audit(conn, user, "UPDATE", "Company", "targets", "Updated company-level targets")
+        self.send_json({"ok": True, "targets": saved})
+
+    def handle_branches_manage_get(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "company_settings_read"):
+            return
+        with db_connect() as conn:
+            rows = []
+            for r in conn.execute("SELECT id,name,active FROM branches ORDER BY id"):
+                branch = dict(r)
+                branch["employee_count"] = conn.execute(
+                    "SELECT COUNT(*) FROM employees WHERE branch=?", (branch["name"],)
+                ).fetchone()[0]
+                rows.append(branch)
+        self.send_json({
+            "ok": True, "branches": rows,
+            "can_manage": self.has_permission(user, "company_settings_write"),
+        })
+
+    def handle_branch_create(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "company_settings_write"):
+            return
+        name = str(self.parse_json().get("name", "")).strip()
+        if not name:
+            raise ValueError("Branch name is required")
+        with db_connect() as conn:
+            if conn.execute("SELECT 1 FROM branches WHERE name=?", (name,)).fetchone():
+                raise ValueError("A branch with this name already exists")
+            cur = conn.execute("INSERT INTO branches(name,active) VALUES (?,1)", (name,))
+            log_audit(conn, user, "CREATE", "Company", cur.lastrowid, f"Added branch {name}")
+        self.send_json({"ok": True, "id": cur.lastrowid}, 201)
+
+    def handle_branch_update(self, user: dict[str, Any], branch_id: int) -> None:
+        if not self.require_permission(user, "company_settings_write"):
+            return
+        data = self.parse_json()
+        with db_connect() as conn:
+            existing = conn.execute("SELECT * FROM branches WHERE id=?", (branch_id,)).fetchone()
+            if not existing:
+                self.send_error_json("Branch not found", 404); return
+            old_name = existing["name"]
+            new_name = str(data.get("name", old_name)).strip()
+            active = int(bool(data.get("active", existing["active"])))
+            if not new_name:
+                raise ValueError("Branch name is required")
+            dup = conn.execute("SELECT 1 FROM branches WHERE name=? AND id<>?", (new_name, branch_id)).fetchone()
+            if dup:
+                raise ValueError("A branch with this name already exists")
+            if new_name != old_name:
+                # Safe relabel: cascade the rename across every table that stores
+                # a branch name, so existing records stay consistent. This only
+                # renames labels; it does not alter any calculation.
+                for table_row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+                ).fetchall():
+                    table = table_row["name"]
+                    if table == "branches":
+                        continue
+                    if "branch" in table_columns(conn, table):
+                        conn.execute(f"UPDATE {table} SET branch=? WHERE branch=?", (new_name, old_name))
+            conn.execute("UPDATE branches SET name=?,active=? WHERE id=?", (new_name, active, branch_id))
+            log_audit(conn, user, "UPDATE", "Company", branch_id,
+                      f"Branch {old_name} -> {new_name} | active={active}")
+        self.send_json({"ok": True})
 
     def handle_dashboard(self, user: dict[str, Any]) -> None:
         if not self.require_permission(user, "dashboard"):
