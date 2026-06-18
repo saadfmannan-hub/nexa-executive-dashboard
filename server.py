@@ -162,9 +162,9 @@ def now_iso() -> str:
 SUPPORTED_LANGUAGES = ("en", "ar")
 DEFAULT_LANGUAGE = "en"
 
-# Company profile defaults — Dar al Sultan remains the active demo company.
-# Future clients override these values from Settings → Company Profile without
-# any code change.
+# Company profile defaults — intentionally blank so the app ships with no
+# client-specific branding. Each deployment fills these in from
+# Settings → Company Profile without any code change.
 COMPANY_PROFILE_FIELDS = (
     "company_name",
     "company_address",
@@ -174,7 +174,7 @@ COMPANY_PROFILE_FIELDS = (
     "company_vat",
 )
 DEFAULT_COMPANY_PROFILE = {
-    "company_name": "Dar al Sultan",
+    "company_name": "",
     "company_address": "",
     "company_phone": "",
     "company_email": "",
@@ -211,8 +211,8 @@ def get_company_profile(conn: sqlite3.Connection) -> dict[str, str]:
     profile = dict(DEFAULT_COMPANY_PROFILE)
     for field in COMPANY_PROFILE_FIELDS:
         profile[field] = get_setting(conn, field, DEFAULT_COMPANY_PROFILE[field])
-    if not str(profile["company_name"]).strip():
-        profile["company_name"] = DEFAULT_COMPANY_PROFILE["company_name"]
+    # No hardcoded company-name fallback: the profile stays blank until a value
+    # is saved, so a fresh deployment shows no default brand.
     profile["company_logo_updated"] = get_setting(conn, "company_logo_updated", "")
     profile["has_custom_logo"] = bool(get_setting(conn, "company_logo_data", ""))
     return profile
@@ -1472,8 +1472,8 @@ class AppHandler(BaseHTTPRequestHandler):
     MAX_LOGO_BYTES = 2 * 1024 * 1024
 
     def handle_company_logo(self) -> None:
-        """Public: serve the active company logo, falling back to the bundled
-        Dar al Sultan logo when no custom logo has been uploaded."""
+        """Public: serve the active company logo. When no custom logo has been
+        uploaded, return a neutral generic placeholder (no client branding)."""
         with db_connect() as conn:
             data_b64 = get_setting(conn, "company_logo_data", "")
             mime = get_setting(conn, "company_logo_mime", "")
@@ -1490,18 +1490,26 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 self.wfile.write(content)
                 return
-        # Fallback to the default Dar al Sultan logo.
-        default_logo = STATIC_DIR / "dar-al-sultan-logo.png"
-        if default_logo.exists():
-            content = default_logo.read_bytes()
-            self.send_response(200)
-            self.send_header("Content-Type", "image/png")
-            self.send_header("Content-Length", str(len(content)))
-            self.send_header("Cache-Control", "no-cache")
-            self.end_headers()
-            self.wfile.write(content)
-        else:
-            self.send_error(404)
+        # No custom logo uploaded — serve a neutral generic placeholder so the
+        # app assumes no client-specific branding by default.
+        placeholder = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="160" '
+            'viewBox="0 0 240 160">'
+            '<rect x="3" y="3" width="234" height="154" rx="16" fill="none" '
+            'stroke="#9ba7b7" stroke-width="2" stroke-dasharray="7 7" opacity="0.45"/>'
+            '<g fill="none" stroke="#9ba7b7" stroke-width="2.5" opacity="0.55" '
+            'stroke-linecap="round" stroke-linejoin="round">'
+            '<rect x="84" y="52" width="72" height="56" rx="8"/>'
+            '<circle cx="104" cy="72" r="7"/>'
+            '<path d="M88 104 L110 82 L128 98 L140 88 L152 104"/>'
+            '</g></svg>'
+        ).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "image/svg+xml")
+        self.send_header("Content-Length", str(len(placeholder)))
+        self.send_header("Cache-Control", "no-cache")
+        self.end_headers()
+        self.wfile.write(placeholder)
 
     def handle_company_profile_get(self, user: dict[str, Any]) -> None:
         if not self.require_permission(user, "company_settings_read"):

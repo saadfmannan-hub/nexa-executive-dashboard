@@ -314,3 +314,6 @@ select option:focus{background:#243450;color:#fff}
 
 [dir="rtl"] .exec-hero:before{background:linear-gradient(270deg,transparent,rgba(213,179,107,.6),transparent)}
 [dir="rtl"] .exec-alert-row,[dir="rtl"] .exec-action-card,[dir="rtl"] .exec-alert-stat{text-align:right}
+
+/* Neutral "no logo uploaded" placeholder for Company Profile (no default brand). */
+.logo-empty-note{font-size:11px;color:var(--muted);text-align:center;padding:0 10px;line-height:1.4}

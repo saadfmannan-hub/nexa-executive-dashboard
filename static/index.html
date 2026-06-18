@@ -4,12 +4,12 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#101725" />
-  <title>Dar al Sultan — CFO & Production</title>
+  <title>Management Dashboard</title>
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=3.7-exec" />
-  <script src="i18n.js?v=3.7-exec"></script>
+  <link rel="stylesheet" href="styles.css?v=3.8-branding" />
+  <script src="i18n.js?v=3.8-branding"></script>
 </head>
 <body>
   <div class="cloud-demo-banner" id="cloudDemoBanner">CLOUD DEMO · SAMPLE DATA · OWNER PRESENTATION VERSION</div>
@@ -17,7 +17,7 @@
     <div class="login-visual">
       <div class="pattern"></div>
       <div class="login-brand">
-        <img class="brand-logo login-logo" src="dar-al-sultan-logo.png" alt="Company logo" />
+        <img class="brand-logo login-logo" src="/api/company/logo" alt="Company logo" />
         <span class="eyebrow" data-company-name></span>
         <h1>Business Intelligence<br>& Production Control</h1>
         <p>A secure cloud-ready CFO management system for finance, workshops, employees and multi-branch performance.</p>
@@ -49,8 +49,8 @@
   <div class="app-shell hidden" id="appShell">
     <aside class="sidebar" id="sidebar">
       <div class="brand">
-        <img class="brand-logo sidebar-logo" src="dar-al-sultan-logo.png" alt="Company logo" />
-        <div><h1 data-company-name>Dar al Sultan</h1><p>CFO & Production</p></div>
+        <img class="brand-logo sidebar-logo" src="/api/company/logo" alt="Company logo" />
+        <div><h1 data-company-name>Company Dashboard</h1><p>CFO & Production</p></div>
       </div>
       <nav class="nav" id="navigation">
         <button class="nav-item active" data-page="dashboard" data-permission="dashboard"><span>◫</span> Dashboard</button>
@@ -78,7 +78,7 @@
     <main class="main">
       <header class="topbar">
         <button class="menu-btn" id="menuBtn">☰</button>
-        <img class="topbar-logo" src="dar-al-sultan-logo.png" alt="" aria-hidden="true" />
+        <img class="topbar-logo" src="/api/company/logo" alt="" aria-hidden="true" />
         <div><h2 id="pageTitle">Executive Dashboard</h2><p id="pageSubtitle">Company-wide financial and production overview</p></div>
         <div class="top-actions">
           <select id="globalBranch" class="control"><option value="All">All Branches</option></select>
@@ -554,11 +554,10 @@
               <label>&nbsp;<span class="muted-note">Used on the dashboard header and sign-in screen.</span></label>
               <label class="span-2">Company Address<input name="company_address" /></label>
               <div class="span-2 logo-upload-row">
-                <div class="logo-preview"><img id="companyLogoPreview" src="/api/company/logo" alt="Company logo" /></div>
+                <div class="logo-preview"><img id="companyLogoPreview" src="/api/company/logo" alt="Company logo" /><span class="logo-empty-note hidden" id="companyLogoEmpty">No logo uploaded</span></div>
                 <div class="logo-upload-actions company-settings-write">
                   <label class="logo-file-label">Company Logo<input type="file" id="companyLogoInput" accept="image/png,image/jpeg,image/webp,image/svg+xml" /></label>
                   <small class="muted-note">PNG, JPG, WEBP or SVG, up to 2 MB.</small>
-                  <button type="button" class="secondary-btn" id="removeCompanyLogoBtn">Reset to Default Logo</button>
                 </div>
               </div>
               <div class="form-actions span-2 company-settings-write"><button type="submit" class="primary-btn">Save Company Profile</button></div>
@@ -934,7 +933,7 @@
 
   <div class="confirm-modal" id="confirmModal"><div class="confirm-card"><h3 id="confirmTitle">Confirm action</h3><p id="confirmMessage"></p><div><button class="secondary-btn" id="confirmCancel">Cancel</button><button class="danger-btn" id="confirmOk">Delete</button></div></div></div>
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=3.7-exec"></script>
+  <script src="app.js?v=3.8-branding"></script>
   <script>if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));</script>
 </body>
 </html>

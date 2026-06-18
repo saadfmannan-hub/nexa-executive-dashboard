@@ -1,7 +1,7 @@
 {
-  "name": "Dar al Sultan Management System",
-  "short_name": "Dar al Sultan",
-  "description": "Dar al Sultan advanced executive management, finance, production and multi-branch analytics system",
+  "name": "Management Dashboard",
+  "short_name": "Dashboard",
+  "description": "Advanced executive management, finance, production and multi-branch analytics system",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
