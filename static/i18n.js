@@ -40,7 +40,6 @@
     "Users & Roles": "المستخدمون والصلاحيات",
     "Settings": "الإعدادات",
     "● Cloud Demo Connected": "● النسخة التجريبية متصلة",
-    "Phase 3.4 · Luxury 3D Analytics": "المرحلة 3.4 · تحليلات ثلاثية الأبعاد فاخرة",
     "Made by": "إعداد",
 
     /* Cloud demo banner */
