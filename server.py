@@ -159,6 +159,11 @@ def now_iso() -> str:
     return datetime.now().replace(microsecond=0).isoformat(sep=" ")
 
 
+def current_month_range() -> tuple[str, str]:
+    today = datetime.now().date()
+    return today.replace(day=1).isoformat(), today.isoformat()
+
+
 SUPPORTED_LANGUAGES = ("en", "ar")
 DEFAULT_LANGUAGE = "en"
 
@@ -3094,8 +3099,9 @@ class AppHandler(BaseHTTPRequestHandler):
     def production_filters(self, user: dict[str, Any]) -> tuple[str, list[Any]]:
         q = self.query()
         branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
-        start = q.get("start", ["2026-06-01"])[0]
-        end = q.get("end", ["2026-06-30"])[0]
+        default_start, default_end = current_month_range()
+        start = q.get("start", [default_start])[0] or default_start
+        end = q.get("end", [default_end])[0] or default_end
         employee_id = q.get("employee_id", [""])[0]
         where = " WHERE p.date BETWEEN ? AND ?"
         params: list[Any] = [start, end]
@@ -3111,8 +3117,9 @@ class AppHandler(BaseHTTPRequestHandler):
         where, params = self.production_filters(user)
         q = self.query()
         ready_branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
-        ready_start = q.get("start", ["2026-06-01"])[0]
-        ready_end = q.get("end", ["2026-06-30"])[0]
+        default_start, default_end = current_month_range()
+        ready_start = q.get("start", [default_start])[0] or default_start
+        ready_end = q.get("end", [default_end])[0] or default_end
         ready_where = "WHERE date BETWEEN ? AND ?"
         ready_params: list[Any] = [ready_start, ready_end]
         if ready_branch != "All":
@@ -3160,8 +3167,9 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         q = self.query()
         branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
-        start = q.get("start", ["2026-06-01"])[0]
-        end = q.get("end", ["2026-06-30"])[0]
+        default_start, default_end = current_month_range()
+        start = q.get("start", [default_start])[0] or default_start
+        end = q.get("end", [default_end])[0] or default_end
         where = "WHERE date BETWEEN ? AND ?"
         params: list[Any] = [start, end]
         if branch != "All":

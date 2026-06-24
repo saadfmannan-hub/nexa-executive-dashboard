@@ -292,8 +292,8 @@
         <div class="filter-bar">
           <select id="prodBranch" class="control"><option value="All">All Branches</option></select>
           <select id="prodEmployee" class="control"><option value="">All Employees</option></select>
-          <input id="prodStart" class="control" type="date" value="2026-06-01" />
-          <input id="prodEnd" class="control" type="date" value="2026-06-10" />
+          <input id="prodStart" class="control" type="date" />
+          <input id="prodEnd" class="control" type="date" />
           <button class="secondary-btn" id="applyProductionFilter">Apply Filter</button>
         </div>
         <div class="kpi-grid compact-kpis" id="productionKpis"></div>
@@ -313,12 +313,13 @@
           <div class="table-wrap"><table><thead><tr><th>Date</th><th>Day</th><th>Branch</th><th>Total Ready Completed</th><th>Notes</th><th>Entered By</th><th class="production-write">Actions</th></tr></thead><tbody id="dailyReadyCompletedBody"></tbody></table></div>
         </article>
         <article class="panel">
-          <div class="panel-head"><div><span class="eyebrow">EMPLOYEE TOTALS</span><h3>Current Production Summary</h3></div><button class="secondary-btn" id="exportProductionBtn">Export CSV</button></div>
-          <div class="table-wrap"><table class="wide-table"><thead><tr><th>Employee</th><th>Branch</th><th>Body</th><th>Joint/Side</th><th>Full Body</th><th>Daraz</th><th>VIP Design</th><th>Button</th><th>Alteration</th><th>Cutting</th><th>Iron</th><th>Total Activity</th><th>Total Pcs Produced</th><th>OT</th><th>History</th></tr></thead><tbody id="productionSummaryBody"></tbody></table></div>
-        </article>
-        <article class="panel">
           <div class="panel-head"><div><span class="eyebrow">DAILY BREAKUP</span><h3>Daily Production Entries</h3></div></div>
           <div class="table-wrap"><table class="wide-table"><thead><tr><th>Date</th><th>Day</th><th>Employee</th><th>Branch</th><th>Activity</th><th>Pcs Done</th><th>Produced</th><th>OT</th><th>Entered By</th><th class="production-write">Actions</th></tr></thead><tbody id="productionEntriesBody"></tbody></table></div>
+          <div class="production-entries-footer"><span class="muted-note" id="productionEntriesScope"></span><button type="button" class="secondary-btn" id="toggleProductionEntriesBtn">Show More</button></div>
+        </article>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">EMPLOYEE TOTALS</span><h3>Current Production Summary</h3></div><button class="secondary-btn" id="exportProductionBtn">Export CSV</button></div>
+          <div class="table-wrap"><table class="wide-table"><thead><tr><th>Employee</th><th>Branch</th><th>Body</th><th>Joint/Side</th><th>Full Body</th><th>Daraz</th><th>VIP Design</th><th>Button</th><th>Alteration</th><th>Cutting</th><th>Iron</th><th>Total Activity</th><th>Total Pcs Produced</th><th>OT</th><th>History</th></tr></thead><tbody id="productionSummaryBody"></tbody></table></div>
         </article>
       </section>
 
@@ -722,12 +723,12 @@
     </div>
   </div>
 
-  <div class="modal" id="productionModal">
+  <div class="modal" id="productionModal" data-static-backdrop="true">
     <div class="modal-card">
       <div class="modal-head"><div><span class="eyebrow">PRODUCTION ENTRY</span><h3 id="productionModalTitle">Record Daily Production</h3></div><button class="icon-btn" data-close="productionModal">×</button></div>
       <form id="productionForm" class="form-grid">
         <input type="hidden" name="id" />
-        <label>Date<input required type="date" name="date" value="2026-06-10" /></label>
+        <label>Date<input required type="date" name="date" /></label>
         <label>Branch<select required name="branch" id="productionEntryBranch"></select></label>
         <label>Employee<select required name="employee_id" id="productionEntryEmployee"></select></label>
         <div class="span-2 production-pair-fields hidden" id="productionPairFields">
@@ -751,12 +752,12 @@
     </div>
   </div>
 
-  <div class="modal" id="readyCompletedModal">
+  <div class="modal" id="readyCompletedModal" data-static-backdrop="true">
     <div class="modal-card">
       <div class="modal-head"><div><span class="eyebrow">WORKSHOP DAY-END</span><h3 id="readyCompletedModalTitle">Record Total Ready Completed</h3></div><button class="icon-btn" data-close="readyCompletedModal">×</button></div>
       <form id="readyCompletedForm" class="form-grid">
         <input type="hidden" name="id" />
-        <label>Date<input required type="date" name="date" value="2026-06-10" /></label>
+        <label>Date<input required type="date" name="date" /></label>
         <label>Branch<select required name="branch" id="readyCompletedBranch"></select></label>
         <label class="span-2">Total Ready Completed<input required min="0" step="1" type="number" name="total_ready_completed" value="0" /><small>Final full dishdashas completed and ready at the end of this day.</small></label>
         <label class="span-2">Notes<input name="notes" placeholder="Optional day-end workshop note" /></label>
