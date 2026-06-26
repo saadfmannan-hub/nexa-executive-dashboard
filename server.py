@@ -186,19 +186,27 @@ DEFAULT_LANGUAGE = "en"
 # Settings → Company Profile without any code change.
 COMPANY_PROFILE_FIELDS = (
     "company_name",
+    "company_subtitle",
+    "currency_label",
     "company_address",
     "company_phone",
     "company_email",
     "company_website",
     "company_vat",
+    "demo_mode",
+    "demo_banner_text",
 )
 DEFAULT_COMPANY_PROFILE = {
     "company_name": "",
+    "company_subtitle": "",
+    "currency_label": "OMR",
     "company_address": "",
     "company_phone": "",
     "company_email": "",
     "company_website": "",
     "company_vat": "",
+    "demo_mode": "1",
+    "demo_banner_text": "CLOUD DEMO \u00b7 SAMPLE DATA \u00b7 OWNER PRESENTATION VERSION",
 }
 # Owner-level informational targets (additive; do not feed existing calculations).
 OWNER_TARGET_FIELDS = ("monthly_production_target", "monthly_income_target")
@@ -226,10 +234,26 @@ def set_setting(conn: sqlite3.Connection, key: str, value: str) -> None:
     )
 
 
-def get_company_profile(conn: sqlite3.Connection) -> dict[str, str]:
+def setting_enabled(value: Any, default: bool = True) -> bool:
+    if value is None:
+        return default
+    text = str(value).strip().lower()
+    if not text:
+        return default
+    if text in {"0", "false", "off", "no"}:
+        return False
+    if text in {"1", "true", "on", "yes"}:
+        return True
+    return default
+
+
+def get_company_profile(conn: sqlite3.Connection) -> dict[str, Any]:
     profile = dict(DEFAULT_COMPANY_PROFILE)
     for field in COMPANY_PROFILE_FIELDS:
         profile[field] = get_setting(conn, field, DEFAULT_COMPANY_PROFILE[field])
+    profile["currency_label"] = (profile.get("currency_label") or DEFAULT_COMPANY_PROFILE["currency_label"]).strip() or DEFAULT_COMPANY_PROFILE["currency_label"]
+    profile["demo_mode"] = setting_enabled(profile.get("demo_mode"), default=True)
+    profile["demo_banner_text"] = (profile.get("demo_banner_text") or DEFAULT_COMPANY_PROFILE["demo_banner_text"]).strip() or DEFAULT_COMPANY_PROFILE["demo_banner_text"]
     # No hardcoded company-name fallback: the profile stays blank until a value
     # is saved, so a fresh deployment shows no default brand.
     profile["company_logo_updated"] = get_setting(conn, "company_logo_updated", "")
@@ -1179,11 +1203,19 @@ class AppHandler(BaseHTTPRequestHandler):
                     "ok": True,
                     "version": APP_VERSION,
                     "cloud_mode": CLOUD_MODE,
-                    "demo_mode": DEMO_MODE,
+                    "runtime_demo_mode": DEMO_MODE,
+                    "demo_mode": profile["demo_mode"],
+                    "demo_banner_text": profile["demo_banner_text"],
                     "database": "SQLite demo" if DEMO_MODE else "SQLite local",
                     "default_language": default_language,
                     "supported_languages": list(SUPPORTED_LANGUAGES),
                     "company_name": profile["company_name"],
+                    "company_subtitle": profile["company_subtitle"],
+                    "currency_label": profile["currency_label"],
+                    "company_phone": profile["company_phone"],
+                    "company_email": profile["company_email"],
+                    "company_address": profile["company_address"],
+                    "company_website": profile["company_website"],
                     "company_logo_updated": profile["company_logo_updated"],
                     "has_custom_logo": profile["has_custom_logo"],
                     "time": now_iso(),
@@ -1545,13 +1577,27 @@ class AppHandler(BaseHTTPRequestHandler):
         name = str(data.get("company_name", "")).strip()
         if not name:
             raise ValueError("Company name is required")
+        currency_label = str(data.get("currency_label", DEFAULT_COMPANY_PROFILE["currency_label"])).strip().upper()
+        if not currency_label:
+            currency_label = DEFAULT_COMPANY_PROFILE["currency_label"]
+        if len(currency_label) > 12:
+            raise ValueError("Currency label must be 12 characters or fewer")
+        demo_banner_text = str(data.get("demo_banner_text", DEFAULT_COMPANY_PROFILE["demo_banner_text"])).strip()
+        if not demo_banner_text:
+            demo_banner_text = DEFAULT_COMPANY_PROFILE["demo_banner_text"]
+        if len(demo_banner_text) > 160:
+            raise ValueError("Demo banner text must be 160 characters or fewer")
         values = {
             "company_name": name,
+            "company_subtitle": str(data.get("company_subtitle", "")).strip(),
+            "currency_label": currency_label,
             "company_address": str(data.get("company_address", "")).strip(),
             "company_phone": str(data.get("company_phone", "")).strip(),
             "company_email": str(data.get("company_email", "")).strip(),
             "company_website": str(data.get("company_website", "")).strip(),
             "company_vat": str(data.get("company_vat", "")).strip(),
+            "demo_mode": "1" if setting_enabled(data.get("demo_mode"), default=True) else "0",
+            "demo_banner_text": demo_banner_text,
         }
         logo_data = data.get("logo_data")
         logo_mime = str(data.get("logo_mime", "")).strip().lower()

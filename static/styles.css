@@ -58,8 +58,8 @@
 
 /* Phase 3.1 cloud demo presentation banner */
 .cloud-demo-banner{position:fixed;top:0;left:0;right:0;z-index:9999;text-align:center;padding:5px 12px;background:linear-gradient(90deg,#b58a3b,#e2c37c,#b58a3b);color:#15110a;font-size:10px;font-weight:800;letter-spacing:.14em;box-shadow:0 4px 18px rgba(0,0,0,.25)}
-.cloud-demo-banner~.login-screen,.cloud-demo-banner~.app-shell{padding-top:25px}
-@media(max-width:620px){.cloud-demo-banner{font-size:8px;letter-spacing:.08em}.cloud-demo-banner~.login-screen,.cloud-demo-banner~.app-shell{padding-top:24px}}
+.cloud-demo-banner:not(.hidden)~.login-screen,.cloud-demo-banner:not(.hidden)~.app-shell{padding-top:25px}
+@media(max-width:620px){.cloud-demo-banner{font-size:8px;letter-spacing:.08em}.cloud-demo-banner:not(.hidden)~.login-screen,.cloud-demo-banner:not(.hidden)~.app-shell{padding-top:24px}}
 
 /* Phase 3.1.1 owner-requested improvements */
 .inline-input-action{display:flex;gap:8px;align-items:stretch}.inline-input-action input{flex:1}.inline-input-action button{white-space:nowrap}
@@ -88,7 +88,7 @@
 @media(max-width:620px){.section-heading .heading-actions{width:100%;display:grid;grid-template-columns:1fr}.section-heading .heading-actions button{width:100%}.production-entries-footer{align-items:stretch;flex-direction:column}.production-entries-footer .secondary-btn{width:100%}}
 
 
-/* Phase 3.1.7 — Dar al Sultan official branding */
+/* Phase 3.1.7 — configurable company branding */
 .brand-logo{display:block;object-fit:contain;flex:0 0 auto}
 .login-logo{
   width:min(365px,72vw);
@@ -382,7 +382,7 @@ input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator{background
 
 @media(max-width:768px){
   body{background:radial-gradient(circle at 82% 0%,rgba(62,93,139,.18),transparent 32%),linear-gradient(160deg,#06101c,#0b1524 52%,#070e19)}
-  .cloud-demo-banner~.app-shell{padding-top:24px}
+  .cloud-demo-banner:not(.hidden)~.app-shell{padding-top:24px}
   .app-shell{display:block;padding-bottom:calc(88px + env(safe-area-inset-bottom))}
   .main{width:100%;min-height:100vh}
   .page{padding:18px 14px calc(106px + env(safe-area-inset-bottom))}
