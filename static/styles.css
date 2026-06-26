@@ -36,6 +36,7 @@
 
 /* Phase 2.4.1 — manual card numbering and sales-agent commission */
 .commission-panel{margin-top:16px}.commission-head{align-items:flex-start}.commission-filters{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.commission-note{margin:14px 0 0}.membership-grid+.commission-panel{margin-top:16px}
+.report-card{display:flex;flex-direction:column;gap:10px;min-height:190px}.report-card>span{margin-bottom:4px}.report-card small{min-height:40px}.report-actions{margin-top:auto;display:grid;grid-template-columns:1fr 1fr;gap:8px}.report-actions button{width:100%;padding:9px 10px}.panel-head .heading-actions{justify-content:flex-end}
 @media(max-width:700px){.commission-head{align-items:stretch;flex-direction:column}.commission-filters{width:100%}.commission-filters .control{flex:1;min-width:150px}}
 
 .salary-preview{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border:1px solid rgba(213,179,107,.25);border-radius:12px;background:rgba(213,179,107,.08)}

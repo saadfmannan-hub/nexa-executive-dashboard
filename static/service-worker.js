@@ -1,5 +1,5 @@
-const CACHE = "management-dashboard-v3-10-sales-template";
-const ASSETS = ["/", "/index.html", "/styles.css?v=3.10-sales-template", "/i18n.js?v=3.8-branding", "/app.js?v=3.10-sales-template", "/manifest.json", "/favicon.png", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png"];
+const CACHE = "management-dashboard-v3-11-reports-pdf";
+const ASSETS = ["/", "/index.html", "/styles.css?v=3.11-reports-pdf", "/i18n.js?v=3.8-branding", "/app.js?v=3.11-reports-pdf", "/manifest.json", "/favicon.png", "/apple-touch-icon.png", "/icon-192.png", "/icon-512.png"];
 self.addEventListener("install", event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener("activate", event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim())));
 self.addEventListener("fetch", event => {
