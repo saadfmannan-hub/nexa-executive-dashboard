@@ -1284,6 +1284,10 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.handle_pos_sales_list(user)
             elif path == "/api/pos-sales/imports":
                 self.handle_pos_import_batches(user)
+            elif path == "/api/sales/import/template.csv":
+                self.handle_sales_import_template_csv(user)
+            elif path == "/api/sales/import/template.xlsx":
+                self.handle_sales_import_template_xlsx(user)
             elif path == "/api/audit":
                 self.handle_audit(user)
             elif path == "/api/users":
@@ -3435,6 +3439,115 @@ class AppHandler(BaseHTTPRequestHandler):
         "Sell Return Due", "Shipping Status", "Total Items", "Added By", "Sell note",
         "Staff note", "Shipping Details"
     )
+    POS_TEMPLATE_HEADERS = ("Action", *POS_REQUIRED_HEADERS)
+
+    def send_attachment(self, filename: str, content_type: str, body: bytes) -> None:
+        self.send_response(200)
+        self.send_header("Content-Type", content_type)
+        self.send_header("Content-Disposition", f'attachment; filename="{filename}"')
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
+    def build_pos_template_csv(self) -> bytes:
+        output = io.StringIO(newline="")
+        writer = csv.writer(output)
+        writer.writerow(self.POS_TEMPLATE_HEADERS)
+        return output.getvalue().encode("utf-8-sig")
+
+    @staticmethod
+    def xlsx_col_name(index: int) -> str:
+        name = ""
+        index += 1
+        while index:
+            index, rem = divmod(index - 1, 26)
+            name = chr(65 + rem) + name
+        return name
+
+    @staticmethod
+    def xml_escape(value: Any) -> str:
+        return (
+            str(value)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace('"', "&quot;")
+        )
+
+    def xlsx_sheet_xml(self, rows: list[list[Any]]) -> str:
+        row_xml = []
+        for row_idx, row in enumerate(rows, start=1):
+            cells = []
+            for col_idx, value in enumerate(row):
+                ref = f"{self.xlsx_col_name(col_idx)}{row_idx}"
+                text = self.xml_escape(value)
+                cells.append(f'<c r="{ref}" t="inlineStr"><is><t>{text}</t></is></c>')
+            row_xml.append(f'<row r="{row_idx}">{"".join(cells)}</row>')
+        return (
+            '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>'
+            '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'
+            f'<sheetData>{"".join(row_xml)}</sheetData>'
+            '</worksheet>'
+        )
+
+    def build_pos_template_xlsx(self) -> bytes:
+        import_rows = [list(self.POS_TEMPLATE_HEADERS)]
+        instruction_rows = [
+            ["Sales Import Template"],
+            ["Fill the Sales Import sheet, then upload the workbook or save it as CSV."],
+            ["Date formats", "Use YYYY-MM-DD, such as 2026-06-26. MM/DD/YYYY, such as 06/26/2026, is also accepted."],
+            ["Excel date cells", "Date-only Excel cells are accepted."],
+            ["Branch detection", "Location and invoice prefix are used unless a Branch Detection override is selected during import."],
+            ["Duplicate protection", "Invoice No. is the unique key. Re-importing an invoice updates the existing sales record."],
+        ]
+        content_types = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">
+  <Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>
+  <Default Extension="xml" ContentType="application/xml"/>
+  <Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>
+  <Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+  <Override PartName="/xl/worksheets/sheet2.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>
+</Types>"""
+        rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>
+</Relationships>"""
+        workbook = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <sheets>
+    <sheet name="Sales Import" sheetId="1" r:id="rId1"/>
+    <sheet name="Instructions" sheetId="2" r:id="rId2"/>
+  </sheets>
+</workbook>"""
+        workbook_rels = """<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">
+  <Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>
+  <Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet2.xml"/>
+</Relationships>"""
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, "w", zipfile.ZIP_DEFLATED) as archive:
+            archive.writestr("[Content_Types].xml", content_types)
+            archive.writestr("_rels/.rels", rels)
+            archive.writestr("xl/workbook.xml", workbook)
+            archive.writestr("xl/_rels/workbook.xml.rels", workbook_rels)
+            archive.writestr("xl/worksheets/sheet1.xml", self.xlsx_sheet_xml(import_rows))
+            archive.writestr("xl/worksheets/sheet2.xml", self.xlsx_sheet_xml(instruction_rows))
+        return output.getvalue()
+
+    def handle_sales_import_template_csv(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "finance_write"):
+            return
+        self.send_attachment("sales_import_template.csv", "text/csv; charset=utf-8", self.build_pos_template_csv())
+
+    def handle_sales_import_template_xlsx(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "finance_write"):
+            return
+        self.send_attachment(
+            "sales_import_template.xlsx",
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            self.build_pos_template_xlsx(),
+        )
 
     def parse_pos_money(self, value: Any) -> float:
         text = str(value or "").strip().replace(",", "")
@@ -3450,7 +3563,18 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def parse_pos_datetime(self, value: Any) -> tuple[str, str]:
         raw = str(value or "").strip()
-        formats = ("%d-%m-%Y %H:%M", "%d/%m/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M")
+        if re.fullmatch(r"\d+(\.\d+)?", raw):
+            try:
+                serial = float(raw)
+                if 20000 <= serial <= 80000:
+                    dt = datetime(1899, 12, 30) + timedelta(days=serial)
+                    return dt.strftime("%Y-%m-%d %H:%M:%S"), dt.strftime("%Y-%m-%d")
+            except ValueError:
+                pass
+        formats = (
+            "%d-%m-%Y %H:%M", "%d/%m/%Y %H:%M", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M",
+            "%Y-%m-%d", "%d-%m-%Y", "%m/%d/%Y", "%d/%m/%Y",
+        )
         for fmt in formats:
             try:
                 dt = datetime.strptime(raw, fmt)

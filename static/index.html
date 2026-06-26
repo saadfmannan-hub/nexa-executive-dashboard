@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=3.9-white-label" />
+  <link rel="stylesheet" href="styles.css?v=3.10-sales-template" />
   <script src="i18n.js?v=3.8-branding"></script>
 </head>
 <body>
@@ -349,7 +349,11 @@
       <section class="page" id="posSales">
         <div class="section-heading">
           <div><span class="eyebrow">SALES DATA MANAGEMENT</span><h3>Sales, Customers & Outstanding Dues</h3></div>
-          <button class="primary-btn finance-write" id="openPosImportBtn">⇩ Import Sales File</button>
+          <div class="heading-actions pos-heading-actions finance-write">
+            <button class="secondary-btn" id="downloadPosCsvTemplateBtn">Download CSV Template</button>
+            <button class="secondary-btn" id="downloadPosExcelTemplateBtn">Download Excel Template</button>
+            <button class="primary-btn" id="openPosImportBtn">⇩ Import Sales File</button>
+          </div>
         </div>
         <div class="filter-bar">
           <select id="posBranch" class="control"><option value="All">All Branches</option></select>
@@ -397,7 +401,7 @@
       <section class="page" id="payroll">
         <div class="section-heading">
           <div><span class="eyebrow">WORKFORCE FINANCE</span><h3>Payroll & Attendance</h3></div>
-          <div class="heading-actions"><button class="secondary-btn attendance-write" id="addAttendanceBtn">+ Attendance</button></div>
+          <div class="heading-actions"><button class="primary-btn attendance-write" id="addAttendanceBtn">+ Attendance</button></div>
         </div>
         <div class="filter-bar">
           <select id="payrollBranch" class="control"><option value="All">All Branches</option></select>
@@ -934,7 +938,7 @@
 
   <div class="confirm-modal" id="confirmModal"><div class="confirm-card"><h3 id="confirmTitle">Confirm action</h3><p id="confirmMessage"></p><div><button class="secondary-btn" id="confirmCancel">Cancel</button><button class="danger-btn" id="confirmOk">Delete</button></div></div></div>
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=3.9-white-label"></script>
+  <script src="app.js?v=3.10-sales-template"></script>
   <script>if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));</script>
 </body>
 </html>
