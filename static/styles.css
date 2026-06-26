@@ -75,6 +75,7 @@
 .pos-preview-meta strong{color:var(--text)}
 .import-errors{margin-top:12px;padding:12px;border-radius:10px;background:rgba(241,125,125,.08);border:1px solid rgba(241,125,125,.25);color:#ffc0c0;font-size:12px;line-height:1.6}
 .pos-sales-table{min-width:1500px}
+.pos-heading-actions{align-items:center;justify-content:flex-end}.pos-heading-actions .secondary-btn{padding-inline:12px}
 .pos-preview-actions{align-items:center}
 @media(max-width:620px){.extra-large-modal{width:100%;padding:15px}.pos-preview-meta{display:grid}}
 
