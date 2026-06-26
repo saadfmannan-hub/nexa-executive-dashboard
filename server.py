@@ -159,9 +159,23 @@ def now_iso() -> str:
     return datetime.now().replace(microsecond=0).isoformat(sep=" ")
 
 
-def current_month_range() -> tuple[str, str]:
+def current_month_key() -> str:
+    return datetime.now().strftime("%Y-%m")
+
+
+def month_date_range(month: str, cap_current: bool = True) -> tuple[str, str]:
+    dt = datetime.strptime(month, "%Y-%m").date()
+    days = calendar.monthrange(dt.year, dt.month)[1]
+    start = dt.replace(day=1)
+    end = dt.replace(day=days)
     today = datetime.now().date()
-    return today.replace(day=1).isoformat(), today.isoformat()
+    if cap_current and dt.year == today.year and dt.month == today.month:
+        end = today
+    return start.isoformat(), end.isoformat()
+
+
+def current_month_range() -> tuple[str, str]:
+    return month_date_range(current_month_key())
 
 
 SUPPORTED_LANGUAGES = ("en", "ar")
@@ -1661,6 +1675,8 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         q = self.query()
         branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
+        current_start, current_end = current_month_range()
+        current_month = current_start[:7]
         with db_connect() as conn:
             params: list[Any] = []
             branch_clause = ""
@@ -1669,31 +1685,31 @@ class AppHandler(BaseHTTPRequestHandler):
                 params.append(branch)
             historical = list(conn.execute(
                 f"""SELECT month_key,SUM(income) income,SUM(expenses) expenses,SUM(ready_pcs) ready_pcs
-                FROM monthly_financials WHERE month_key BETWEEN '2026-01' AND '2026-05'{branch_clause}
-                GROUP BY month_key ORDER BY month_key""", params
+                FROM monthly_financials WHERE month_key < ?{branch_clause}
+                GROUP BY month_key ORDER BY month_key""", [current_month, *params]
             ))
             current_fin = conn.execute(
                 f"""SELECT COALESCE(SUM(CASE WHEN type='Income' THEN amount ELSE 0 END),0) income,
                 COALESCE(SUM(CASE WHEN type='Expense' THEN amount ELSE 0 END),0) expenses
-                FROM finance_entries WHERE date BETWEEN '2026-06-01' AND '2026-06-30'{branch_clause}""", params
+                FROM finance_entries WHERE date BETWEEN ? AND ?{branch_clause}""", [current_start, current_end, *params]
             ).fetchone()
-            prod_params = params.copy()
+            prod_params = [current_start, current_end, *params]
             prod_rows = list(conn.execute(
                 f"""SELECT employee_id,
                 SUM(CASE WHEN activity='Body' THEN quantity ELSE 0 END) body,
                 SUM(CASE WHEN activity='Joint/Side' THEN quantity ELSE 0 END) joint_side,
                 SUM(CASE WHEN activity NOT IN ('Body','Joint/Side') THEN quantity ELSE 0 END) other_qty
-                FROM production_entries WHERE date BETWEEN '2026-06-01' AND '2026-06-30'{branch_clause}
+                FROM production_entries WHERE date BETWEEN ? AND ?{branch_clause}
                 GROUP BY employee_id""", prod_params
             ))
             entry_count = conn.execute(
-                f"SELECT COUNT(*) c FROM production_entries WHERE date BETWEEN '2026-06-01' AND '2026-06-30'{branch_clause}", prod_params
+                f"SELECT COUNT(*) c FROM production_entries WHERE date BETWEEN ? AND ?{branch_clause}", prod_params
             ).fetchone()["c"]
             calculated_stage_pcs = round(sum(min(float(r["body"] or 0),float(r["joint_side"] or 0))+float(r["other_qty"] or 0) for r in prod_rows),3)
             ready_row = conn.execute(
                 f"""SELECT COALESCE(SUM(total_ready_completed),0) ready_pcs,COUNT(*) ready_days
-                FROM production_daily_ready WHERE date BETWEEN '2026-06-01' AND '2026-06-30'{branch_clause}""",
-                params,
+                FROM production_daily_ready WHERE date BETWEEN ? AND ?{branch_clause}""",
+                [current_start, current_end, *params],
             ).fetchone()
             current_prod = {
                 "ready_pcs": int(ready_row["ready_pcs"] or 0),
@@ -1707,9 +1723,9 @@ class AppHandler(BaseHTTPRequestHandler):
                 COUNT(CASE WHEN status NOT IN ('Delivered','Cancelled') THEN 1 END) pending_orders,
                 COUNT(CASE WHEN status='Ready' THEN 1 END) ready_orders,
                 COUNT(CASE WHEN due_date < date('now') AND status NOT IN ('Delivered','Cancelled') THEN 1 END) overdue_orders,
-                COUNT(CASE WHEN status='Delivered' AND booking_date BETWEEN '2026-06-01' AND '2026-06-30' THEN 1 END) delivered_orders
+                COUNT(CASE WHEN status='Delivered' AND booking_date BETWEEN ? AND ? THEN 1 END) delivered_orders
                 FROM customer_orders WHERE 1=1{branch_clause}""",
-                params,
+                [current_start, current_end, *params],
             ).fetchone()
             conn.execute("UPDATE membership_cards SET status='Expired',updated_at=? WHERE expiry_date < date('now') AND status='Active'", (now_iso(),))
             membership_summary = conn.execute(
@@ -1717,22 +1733,23 @@ class AppHandler(BaseHTTPRequestHandler):
                 COUNT(CASE WHEN status='Active' AND expiry_date >= date('now') THEN 1 END) active_cards,
                 COUNT(CASE WHEN status='Active' AND expiry_date BETWEEN date('now') AND date('now','+30 day') THEN 1 END) expiring_cards,
                 COALESCE(SUM(CASE WHEN status='Active' THEN current_balance ELSE 0 END),0) wallet_outstanding,
-                COALESCE(SUM(CASE WHEN issue_date BETWEEN '2026-06-01' AND '2026-06-30' THEN sale_price ELSE 0 END),0) month_card_sales
+                COALESCE(SUM(CASE WHEN issue_date BETWEEN ? AND ? THEN sale_price ELSE 0 END),0) month_card_sales
                 FROM membership_cards WHERE 1=1{branch_clause}""",
-                params,
+                [current_start, current_end, *params],
             ).fetchone()
             branch_rows = list(conn.execute(
                 """SELECT b.name branch,
                 COALESCE(SUM(CASE WHEN f.type='Income' THEN f.amount ELSE 0 END),0) income,
                 COALESCE(SUM(CASE WHEN f.type='Expense' THEN f.amount ELSE 0 END),0) expenses
-                FROM branches b LEFT JOIN finance_entries f ON b.name=f.branch AND f.date BETWEEN '2026-06-01' AND '2026-06-30'
-                WHERE b.active=1 GROUP BY b.name ORDER BY b.id"""
+                FROM branches b LEFT JOIN finance_entries f ON b.name=f.branch AND f.date BETWEEN ? AND ?
+                WHERE b.active=1 GROUP BY b.name ORDER BY b.id""",
+                [current_start, current_end],
             ))
         monthly = [
             {"month_key": r["month_key"], "month": month_name(r["month_key"]), "income": r["income"], "expenses": r["expenses"], "ready_pcs": r["ready_pcs"]}
             for r in historical
         ]
-        monthly.append({"month_key":"2026-06","month":"June 2026 MTD","income":current_fin["income"],"expenses":current_fin["expenses"],"ready_pcs":current_prod["ready_pcs"]})
+        monthly.append({"month_key":current_month,"month":month_name(current_month)+" MTD","income":current_fin["income"],"expenses":current_fin["expenses"],"ready_pcs":current_prod["ready_pcs"]})
         can_see_finance = self.has_permission(user, "finance_read")
         payload = {
             "ok": True,
@@ -1776,6 +1793,7 @@ class AppHandler(BaseHTTPRequestHandler):
             q.get("include_inactive", ["0"])[0] == "1"
             and self.has_permission(user, "employee_write")
         )
+        current_start, current_end = current_month_range()
         with db_connect() as conn:
             sql = "SELECT * FROM employees WHERE 1=1"
             params: list[Any] = []
@@ -1792,8 +1810,8 @@ class AppHandler(BaseHTTPRequestHandler):
                     COALESCE(SUM(CASE WHEN activity='Body' THEN quantity ELSE 0 END),0) body,
                     COALESCE(SUM(CASE WHEN activity='Joint/Side' THEN quantity ELSE 0 END),0) joint_side,
                     COALESCE(SUM(CASE WHEN activity NOT IN ('Body','Joint/Side') THEN quantity ELSE 0 END),0) other_qty
-                    FROM production_entries WHERE employee_id=? AND date BETWEEN '2026-06-01' AND '2026-06-30'""",
-                    (emp["id"],),
+                    FROM production_entries WHERE employee_id=? AND date BETWEEN ? AND ?""",
+                    (emp["id"], current_start, current_end),
                 ).fetchone()
                 emp.update(dict(totals))
                 emp["ready_pcs"] = round(min(float(totals["body"] or 0),float(totals["joint_side"] or 0))+float(totals["other_qty"] or 0),3)
@@ -1899,7 +1917,7 @@ class AppHandler(BaseHTTPRequestHandler):
     def payroll_context(self, user: dict[str, Any]) -> tuple[str, str]:
         q = self.query()
         branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
-        month = q.get("month", [datetime.now().strftime("%Y-%m")])[0]
+        month = q.get("month", [current_month_key()])[0]
         try:
             datetime.strptime(month, "%Y-%m")
         except ValueError as exc:
@@ -1909,7 +1927,7 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def budget_context(self, user: dict[str, Any]) -> tuple[str, str]:
         q = self.query()
-        month = q.get("month", [datetime.now().strftime("%Y-%m")])[0]
+        month = q.get("month", [current_month_key()])[0]
         try:
             datetime.strptime(month, "%Y-%m")
         except ValueError as exc:
@@ -1920,8 +1938,7 @@ class AppHandler(BaseHTTPRequestHandler):
     def budget_month_bounds(self, month: str) -> tuple[str, str, int, int]:
         dt = datetime.strptime(month, "%Y-%m")
         days = calendar.monthrange(dt.year, dt.month)[1]
-        start = f"{month}-01"
-        end = f"{month}-{days:02d}"
+        start, end = month_date_range(month)
         today = datetime.now().date()
         if dt.year == today.year and dt.month == today.month:
             elapsed = today.day
@@ -2284,10 +2301,8 @@ class AppHandler(BaseHTTPRequestHandler):
         if not self.require_permission(user, "payroll_read"):
             return
         branch, month = self.payroll_context(user)
-        start = month + "-01"
-        year, mon = map(int, month.split("-"))
-        end = f"{month}-{calendar.monthrange(year, mon)[1]:02d}"
-        params: list[Any] = [month, start, end, month, start, end]
+        start, end = month_date_range(month)
+        params: list[Any] = [month, start, end, start, end, start, end]
         branch_sql = ""
         if branch != "All":
             branch_sql = " AND e.branch=?"
@@ -2318,7 +2333,7 @@ class AppHandler(BaseHTTPRequestHandler):
             ) att ON att.employee_id=e.id
             LEFT JOIN (
                 SELECT employee_id,SUM(ot_hours) prod_ot_hours FROM production_entries
-                WHERE date LIKE ? || '%' GROUP BY employee_id
+                WHERE date BETWEEN ? AND ? GROUP BY employee_id
             ) prod ON prod.employee_id=e.id
             LEFT JOIN (
                 SELECT sales_agent_id employee_id,SUM(commission_amount) card_commission
@@ -2400,10 +2415,11 @@ class AppHandler(BaseHTTPRequestHandler):
     def handle_attendance_list(self, user: dict[str, Any]) -> None:
         if not self.require_permission(user, "attendance_read"):
             return
-        q=self.query(); branch=self.allowed_branch(user,q.get("branch",["All"])[0]); month=q.get("month",[datetime.now().strftime("%Y-%m")])[0]
+        q=self.query(); branch=self.allowed_branch(user,q.get("branch",["All"])[0]); month=q.get("month",[current_month_key()])[0]
         try: datetime.strptime(month,"%Y-%m")
         except ValueError as exc: raise ValueError("Invalid attendance month") from exc
-        clauses=["a.date LIKE ?"]; params=[month+"%"]
+        start,end=month_date_range(month)
+        clauses=["a.date BETWEEN ? AND ?"]; params=[start,end]
         if branch!="All": clauses.append("a.branch=?"); params.append(branch)
         employee=q.get("employee_id",[""])[0]
         if employee: clauses.append("a.employee_id=?"); params.append(int(employee))
@@ -2453,8 +2469,9 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_export_attendance(self, user: dict[str, Any]) -> None:
         if not self.require_permission(user,"attendance_read"): return
-        q=self.query(); branch=self.allowed_branch(user,q.get("branch",["All"])[0]); month=q.get("month",[datetime.now().strftime("%Y-%m")])[0]
-        params=[month+"%"]; where="a.date LIKE ?"
+        q=self.query(); branch=self.allowed_branch(user,q.get("branch",["All"])[0]); month=q.get("month",[current_month_key()])[0]
+        start,end=month_date_range(month)
+        params=[start,end]; where="a.date BETWEEN ? AND ?"
         if branch!="All": where+=" AND a.branch=?"; params.append(branch)
         with db_connect() as conn:
             rows=list(conn.execute(f"""SELECT a.*,e.name,e.role FROM attendance_records a JOIN employees e ON e.id=a.employee_id
@@ -2467,8 +2484,9 @@ class AppHandler(BaseHTTPRequestHandler):
         q = self.query()
         branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
         status = q.get("status", ["All"])[0]
-        start = q.get("start", ["2026-01-01"])[0]
-        end = q.get("end", ["2026-12-31"])[0]
+        default_start, default_end = current_month_range()
+        start = q.get("start", [default_start])[0] or default_start
+        end = q.get("end", [default_end])[0] or default_end
         search = q.get("search", [""])[0].strip()
         clauses = ["o.booking_date BETWEEN ? AND ?"]
         params: list[Any] = [start, end]
@@ -3045,13 +3063,14 @@ class AppHandler(BaseHTTPRequestHandler):
     def membership_commission_filters(self, user: dict[str, Any]) -> tuple[str, list[Any], str, str]:
         q = self.query()
         branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
-        month = q.get("month", [datetime.now().strftime("%Y-%m")])[0]
+        month = q.get("month", [current_month_key()])[0]
         try:
             datetime.strptime(month, "%Y-%m")
         except ValueError as exc:
             raise ValueError("Commission month must use YYYY-MM format") from exc
-        where = " WHERE substr(mc.issue_date,1,7)=?"
-        params: list[Any] = [month]
+        start, end = month_date_range(month)
+        where = " WHERE mc.issue_date BETWEEN ? AND ?"
+        params: list[Any] = [start, end]
         if branch != "All":
             where += " AND mc.branch=?"; params.append(branch)
         return where, params, branch, month
@@ -3796,8 +3815,9 @@ class AppHandler(BaseHTTPRequestHandler):
     def pos_sales_filters(self, user: dict[str, Any]) -> tuple[str, list[Any], dict[str, str]]:
         q = self.query()
         branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
-        start = q.get("start", ["2026-01-01"])[0]
-        end = q.get("end", ["2026-12-31"])[0]
+        default_start, default_end = current_month_range()
+        start = q.get("start", [default_start])[0] or default_start
+        end = q.get("end", [default_end])[0] or default_end
         status = q.get("status", ["All"])[0]
         search = q.get("search", [""])[0].strip()
         where = " WHERE ps.sale_date BETWEEN ? AND ?"
@@ -3870,7 +3890,7 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_finance_list(self, user: dict[str, Any]) -> None:
         if not self.require_permission(user,"finance_read"):return
-        q=self.query();branch=self.allowed_branch(user,q.get("branch",["All"])[0]);start=q.get("start",["2026-06-01"])[0];end=q.get("end",["2026-06-30"])[0]
+        q=self.query();branch=self.allowed_branch(user,q.get("branch",["All"])[0]);default_start,default_end=current_month_range();start=q.get("start",[default_start])[0] or default_start;end=q.get("end",[default_end])[0] or default_end
         sql="SELECT * FROM finance_entries WHERE date BETWEEN ? AND ?";params:[Any]=[start,end]
         if branch!="All":sql+=" AND branch=?";params.append(branch)
         sql+=" ORDER BY date DESC,id DESC"
@@ -3947,7 +3967,7 @@ class AppHandler(BaseHTTPRequestHandler):
         start = f"{month}-01"
         days_in_month = calendar.monthrange(today_dt.year, today_dt.month)[1]
         elapsed_days = max(1, today_dt.day)
-        end = f"{month}-{days_in_month:02d}"
+        end = today
         alerts: list[dict[str, Any]] = []
         severity_rank = {"critical": 0, "warning": 1, "info": 2, "success": 3}
 
@@ -4321,8 +4341,9 @@ class AppHandler(BaseHTTPRequestHandler):
 
     def handle_export_finance(self,user:dict[str,Any])->None:
         if not self.require_permission(user,"finance_read"):return
-        q=self.query();branch=self.allowed_branch(user,q.get("branch",["All"])[0]);sql="SELECT * FROM finance_entries";params=[]
-        if branch!="All":sql+=" WHERE branch=?";params.append(branch)
+        q=self.query();branch=self.allowed_branch(user,q.get("branch",["All"])[0]);default_start,default_end=current_month_range();start=q.get("start",[default_start])[0] or default_start;end=q.get("end",[default_end])[0] or default_end
+        sql="SELECT * FROM finance_entries WHERE date BETWEEN ? AND ?";params=[start,end]
+        if branch!="All":sql+=" AND branch=?";params.append(branch)
         sql+=" ORDER BY date,id"
         with db_connect() as conn:rs=list(conn.execute(sql,params))
         self.send_csv("dar_al_sultan_financial_entries.csv",["ID","Date","Branch","Type","Category","Description","Amount OMR","Payment Method","Reference","Entered By"],[[r["id"],r["date"],r["branch"],r["type"],r["category"],r["description"],r["amount"],r["payment_method"],r["reference"],r["entered_by"]] for r in rs])

@@ -213,8 +213,8 @@
           <select id="orderBranch" class="control"><option value="All">All Branches</option></select>
           <select id="orderStatus" class="control"><option value="All">All Statuses</option></select>
           <input id="orderSearch" class="control" type="search" placeholder="Order no, customer or phone" />
-          <input id="orderStart" class="control" type="date" value="2026-06-01" />
-          <input id="orderEnd" class="control" type="date" value="2026-06-30" />
+          <input id="orderStart" class="control" type="date" />
+          <input id="orderEnd" class="control" type="date" />
           <button class="secondary-btn" id="applyOrderFilter">Apply Filter</button>
         </div>
         <div class="kpi-grid compact-kpis" id="orderKpis"></div>
@@ -270,7 +270,7 @@
           <div class="panel-head commission-head">
             <div><span class="eyebrow">SALES INCENTIVE CONTROL</span><h3>Monthly Card-Selling Commission</h3></div>
             <div class="commission-filters">
-              <input id="commissionMonth" class="control" type="month" value="2026-06" />
+              <input id="commissionMonth" class="control" type="month" />
               <button class="secondary-btn" id="applyCommissionFilter">Apply</button>
               <button class="secondary-btn" id="exportCommissionBtn">Export CSV</button>
             </div>
@@ -330,8 +330,8 @@
         </div>
         <div class="filter-bar">
           <select id="financeBranch" class="control"><option value="All">All Branches</option></select>
-          <input id="financeStart" class="control" type="date" value="2026-06-01" />
-          <input id="financeEnd" class="control" type="date" value="2026-06-10" />
+          <input id="financeStart" class="control" type="date" />
+          <input id="financeEnd" class="control" type="date" />
           <button class="secondary-btn" id="applyFinanceFilter">Apply Filter</button>
         </div>
         <div class="kpi-grid compact-kpis" id="financeKpis"></div>
@@ -353,8 +353,8 @@
         </div>
         <div class="filter-bar">
           <select id="posBranch" class="control"><option value="All">All Branches</option></select>
-          <input id="posStart" class="control" type="date" value="2026-06-01" />
-          <input id="posEnd" class="control" type="date" value="2026-06-30" />
+          <input id="posStart" class="control" type="date" />
+          <input id="posEnd" class="control" type="date" />
           <select id="posStatus" class="control"><option value="All">All Payment Statuses</option><option>Paid</option><option>Partial</option><option>Due</option></select>
           <input id="posSearch" class="control" type="search" placeholder="Invoice, customer, phone or salesman" />
           <button class="secondary-btn" id="applyPosFilter">Apply Filter</button>
@@ -401,9 +401,13 @@
         </div>
         <div class="filter-bar">
           <select id="payrollBranch" class="control"><option value="All">All Branches</option></select>
-          <input id="payrollMonth" class="control" type="month" value="2026-06" />
+          <input id="payrollMonth" class="control" type="month" />
           <button class="secondary-btn" id="applyPayrollFilter">Apply Filter</button>
         </div>
+        <article class="panel">
+          <div class="panel-head"><div><span class="eyebrow">DAILY ATTENDANCE</span><h3>Attendance Register</h3></div><button class="secondary-btn" id="exportAttendanceBtn">Export Attendance CSV</button></div>
+          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Branch</th><th>Status</th><th>Notes</th><th>Entered By</th><th class="attendance-write">Action</th></tr></thead><tbody id="attendanceTableBody"></tbody></table></div>
+        </article>
         <div class="payroll-read">
           <div class="kpi-grid compact-kpis" id="payrollKpis"></div>
           <div class="analytics-grid module-analytics-grid">
@@ -416,10 +420,6 @@
             <div class="table-wrap"><table class="wide-table"><thead><tr><th>Employee</th><th>Branch</th><th>Basic Salary</th><th>Attendance</th><th>Commission</th><th>Bonus</th><th>OT Amount</th><th>Allowance</th><th>Advance</th><th>Deductions</th><th>Net Salary</th><th>Status</th><th class="payroll-write">Action</th></tr></thead><tbody id="payrollTableBody"></tbody></table></div>
           </article>
         </div>
-        <article class="panel">
-          <div class="panel-head"><div><span class="eyebrow">DAILY ATTENDANCE</span><h3>Attendance Register</h3></div><button class="secondary-btn" id="exportAttendanceBtn">Export Attendance CSV</button></div>
-          <div class="table-wrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Branch</th><th>Status</th><th>Notes</th><th>Entered By</th><th class="attendance-write">Action</th></tr></thead><tbody id="attendanceTableBody"></tbody></table></div>
-        </article>
         <article class="panel info-panel payroll-read"><h3>Editable payroll workflow</h3><p>Basic salary is saved once in the employee profile. Commission, bonus, overtime amount, allowance, advance and deductions remain editable separately for every month.</p></article>
       </section>
 
@@ -430,7 +430,7 @@
         </div>
         <div class="filter-bar">
           <select id="budgetBranch" class="control"><option value="All">All Branches</option></select>
-          <input id="budgetMonth" class="control" type="month" value="2026-06" />
+          <input id="budgetMonth" class="control" type="month" />
           <button class="secondary-btn" id="applyBudgetFilter">Apply Filter</button>
           <button class="secondary-btn budget-write" id="copyBudgetBtn">Copy Previous Month</button>
           <button class="secondary-btn" id="exportBudgetBtn">Export CSV</button>
@@ -613,8 +613,8 @@
         <input type="hidden" name="id" />
         <label>Order Number<input name="order_no" placeholder="Automatic when left blank" /></label>
         <label>Branch<select required name="branch" id="orderEntryBranch"></select></label>
-        <label>Booking Date<input required type="date" name="booking_date" value="2026-06-10" /></label>
-        <label>Due / Delivery Date<input required type="date" name="due_date" value="2026-06-17" /></label>
+        <label>Booking Date<input required type="date" name="booking_date" /></label>
+        <label>Due / Delivery Date<input required type="date" name="due_date" /></label>
         <label>Customer Name<input required name="customer_name" /></label>
         <label>Phone Number<input name="phone" /></label>
         <label>Item Type<select required name="item_type" id="orderItemType"></select></label>
@@ -662,7 +662,7 @@
           <small>Existing employee names appear as suggestions. A new name can also be typed manually.</small>
         </label>
         <label>Commission Rate (%)<input required min="0" max="100" step="0.01" type="number" name="commission_rate" value="10" /></label>
-        <label>Issue Date<input required type="date" name="issue_date" value="2026-06-10" /></label>
+        <label>Issue Date<input required type="date" name="issue_date" /></label>
         <label>Expiry Date<input type="date" name="expiry_date" /><small>Leave blank for automatic plan validity.</small></label>
         <label>Sale Price (OMR)<input min="0" step="0.001" type="number" name="sale_price" value="0" /></label>
         <label>Opening Wallet (OMR)<input min="0" step="0.001" type="number" name="opening_balance" value="0" /></label>
@@ -681,7 +681,7 @@
       <div class="wallet-summary"><span>Available Balance</span><strong id="transactionAvailableBalance">OMR 0.00</strong></div>
       <form id="membershipTransactionForm" class="form-grid">
         <input type="hidden" name="card_id" />
-        <label>Date<input required type="date" name="date" value="2026-06-10" /></label>
+        <label>Date<input required type="date" name="date" /></label>
         <label>Transaction Type<select required name="type" id="membershipTransactionType"></select></label>
         <label>Amount (OMR)<input required min="0.001" step="0.001" type="number" name="amount" /></label>
         <label>Reference<input name="reference" placeholder="Invoice or order number" /></label>
@@ -772,7 +772,7 @@
       <div class="modal-head"><div><span class="eyebrow">FINANCIAL ENTRY</span><h3 id="financeModalTitle">Record Income or Expense</h3></div><button class="icon-btn" data-close="financeModal">×</button></div>
       <form id="financeForm" class="form-grid">
         <input type="hidden" name="id" />
-        <label>Date<input required type="date" name="date" value="2026-06-10" /></label>
+        <label>Date<input required type="date" name="date" /></label>
         <label>Branch<select required name="branch" id="financeEntryBranch"></select></label>
         <label>Type<select required name="type"><option>Income</option><option>Expense</option></select></label>
         <label>Category<select required name="category" id="financeEntryCategory"></select></label>
@@ -919,7 +919,7 @@
     <div class="modal-card">
       <div class="modal-head"><div><span class="eyebrow">ATTENDANCE ENTRY</span><h3>Record Attendance</h3></div><button class="icon-btn" data-close="attendanceModal">×</button></div>
       <form id="attendanceForm" class="form-grid">
-        <label>Date<input required type="date" name="date" value="2026-06-10" /></label>
+        <label>Date<input required type="date" name="date" /></label>
         <label>Branch<select required name="branch" id="attendanceBranchSelect"></select></label>
         <label class="span-2">Employee<select required name="employee_id" id="attendanceEmployeeSelect"></select></label>
         <label>Status<select required name="status" id="attendanceStatusSelect"></select></label>
