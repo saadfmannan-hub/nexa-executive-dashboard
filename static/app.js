@@ -295,7 +295,30 @@ $('roleForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.targe
 function confirmAction(title,message,action){$('confirmTitle').textContent=title;$('confirmMessage').textContent=message;$('confirmOk').textContent=/delete|remove/i.test(title)?'Delete':'Confirm';$('confirmModal').classList.add('open');$('confirmOk').onclick=async()=>{try{await action();$('confirmModal').classList.remove('open')}catch(err){toast(err.message,true)}}}$('confirmCancel').onclick=()=>$('confirmModal').classList.remove('open');
 
 function download(path){window.location.href=path}
-$('exportOrdersBtn').onclick=()=>{const range=getDateRangeValues('orderStart','orderEnd');const p=new URLSearchParams({branch:$('orderBranch').value,status:$('orderStatus').value,start:range.start,end:range.end,search:$('orderSearch').value.trim()});download('/api/export/orders.csv?'+p)};$('exportMembershipBtn').onclick=()=>{const p=new URLSearchParams({branch:$('membershipBranch').value,status:$('membershipStatus').value,search:$('membershipSearch').value.trim()});download('/api/export/membership.csv?'+p)};$('exportCommissionBtn').onclick=()=>{const p=new URLSearchParams({branch:$('membershipBranch').value,month:getMonthValue('commissionMonth')});download('/api/export/membership_commissions.csv?'+p)};$('exportProductionBtn').onclick=()=>{const p=new URLSearchParams({branch:$('prodBranch').value,start:$('prodStart').value||currentMonthStartISO(),end:$('prodEnd').value||todayISO()});if($('prodEmployee').value)p.set('employee_id',$('prodEmployee').value);download('/api/export/production.csv?'+p)};$('exportFinanceBtn').onclick=()=>{const range=getDateRangeValues('financeStart','financeEnd');const p=new URLSearchParams({branch:$('financeBranch').value,start:range.start,end:range.end});download('/api/export/finance.csv?'+p)};$('exportPosSalesBtn').onclick=()=>{const range=getDateRangeValues('posStart','posEnd');const p=new URLSearchParams({branch:$('posBranch').value,start:range.start,end:range.end,status:$('posStatus').value,search:$('posSearch').value.trim()});download('/api/export/pos-sales.csv?'+p)};$('reportProduction').onclick=()=>$('exportProductionBtn').click();$('reportOrders').onclick=()=>$('exportOrdersBtn').click();$('reportMembership').onclick=()=>$('exportMembershipBtn').click();$('reportCommissions').onclick=()=>$('exportCommissionBtn').click();$('reportFinance').onclick=()=>$('exportFinanceBtn').click();$('reportPosSales').onclick=()=>$('exportPosSalesBtn').click();$('backupDatabase').onclick=()=>download('/api/backup');$('printDashboard').onclick=()=>{document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));$('dashboard').classList.add('active');setTimeout(()=>window.print(),200)};
+function setDownload(id,buildPath){const el=$(id);if(el)el.onclick=()=>download(buildPath())}
+const exportPath=(name,ext,params)=>`/api/export/${name}.${ext}?${params}`;
+function orderReportParams(){const range=getDateRangeValues('orderStart','orderEnd');return new URLSearchParams({branch:$('orderBranch').value,status:$('orderStatus').value,start:range.start,end:range.end,search:$('orderSearch').value.trim()})}
+function membershipReportParams(){return new URLSearchParams({branch:$('membershipBranch').value,status:$('membershipStatus').value,search:$('membershipSearch').value.trim()})}
+function commissionReportParams(){return new URLSearchParams({branch:$('membershipBranch').value,month:getMonthValue('commissionMonth')})}
+function productionReportParams(){const p=new URLSearchParams({branch:$('prodBranch').value,start:$('prodStart').value||currentMonthStartISO(),end:$('prodEnd').value||todayISO()});if($('prodEmployee').value)p.set('employee_id',$('prodEmployee').value);return p}
+function financeReportParams(){const range=getDateRangeValues('financeStart','financeEnd');return new URLSearchParams({branch:$('financeBranch').value,start:range.start,end:range.end})}
+function posSalesReportParams(){const range=getDateRangeValues('posStart','posEnd');return new URLSearchParams({branch:$('posBranch').value,start:range.start,end:range.end,status:$('posStatus').value,search:$('posSearch').value.trim()})}
+function payrollReportParams(){return new URLSearchParams({branch:$('payrollBranch').value,month:getMonthValue('payrollMonth')})}
+function budgetReportParams(){return new URLSearchParams({branch:$('budgetBranch').value||'All',month:getMonthValue('budgetMonth')})}
+function alertsReportParams(){return new URLSearchParams({branch:$('alertBranch')?.value||$('globalBranch').value||'All'})}
+[
+  ['exportOrdersBtn','orders','csv',orderReportParams],['exportOrdersPdfBtn','orders','pdf',orderReportParams],['reportOrders','orders','csv',orderReportParams],['reportOrdersPdf','orders','pdf',orderReportParams],
+  ['exportMembershipBtn','membership','csv',membershipReportParams],['exportMembershipPdfBtn','membership','pdf',membershipReportParams],['reportMembership','membership','csv',membershipReportParams],['reportMembershipPdf','membership','pdf',membershipReportParams],
+  ['exportCommissionBtn','membership_commissions','csv',commissionReportParams],['exportCommissionPdfBtn','membership_commissions','pdf',commissionReportParams],['reportCommissions','membership_commissions','csv',commissionReportParams],['reportCommissionsPdf','membership_commissions','pdf',commissionReportParams],
+  ['exportProductionBtn','production','csv',productionReportParams],['exportProductionPdfBtn','production','pdf',productionReportParams],['reportProduction','production','csv',productionReportParams],['reportProductionPdf','production','pdf',productionReportParams],
+  ['exportFinanceBtn','finance','csv',financeReportParams],['exportFinancePdfBtn','finance','pdf',financeReportParams],['reportFinance','finance','csv',financeReportParams],['reportFinancePdf','finance','pdf',financeReportParams],
+  ['exportPosSalesBtn','pos-sales','csv',posSalesReportParams],['exportPosSalesPdfBtn','pos-sales','pdf',posSalesReportParams],['reportPosSales','pos-sales','csv',posSalesReportParams],['reportPosSalesPdf','pos-sales','pdf',posSalesReportParams],
+  ['exportPayrollBtn','payroll','csv',payrollReportParams],['exportPayrollPdfBtn','payroll','pdf',payrollReportParams],['reportPayroll','payroll','csv',payrollReportParams],['reportPayrollPdf','payroll','pdf',payrollReportParams],
+  ['exportAttendanceBtn','attendance','csv',payrollReportParams],['exportAttendancePdfBtn','attendance','pdf',payrollReportParams],['reportAttendance','attendance','csv',payrollReportParams],['reportAttendancePdf','attendance','pdf',payrollReportParams],
+  ['exportBudgetBtn','budget','csv',budgetReportParams],['exportBudgetPdfBtn','budget','pdf',budgetReportParams],['reportBudget','budget','csv',budgetReportParams],['reportBudgetPdf','budget','pdf',budgetReportParams],
+  ['exportAlertsBtn','notifications','csv',alertsReportParams],['exportAlertsPdfBtn','notifications','pdf',alertsReportParams],
+].forEach(([id,name,ext,params])=>setDownload(id,()=>exportPath(name,ext,params())));
+$('backupDatabase').onclick=()=>download('/api/backup');$('printDashboard').onclick=()=>{document.querySelectorAll('.page').forEach(x=>x.classList.remove('active'));$('dashboard').classList.add('active');setTimeout(()=>window.print(),200)};
 
 
 
@@ -320,10 +343,6 @@ $('attendanceBranchSelect').onchange=fillAttendanceReferences;
 $('attendanceForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);try{await api('/api/attendance',{method:'POST',body:{date:f.get('date'),employee_id:Number(f.get('employee_id')),status:f.get('status'),notes:f.get('notes')}});closeModal('attendanceModal');await loadPayrollAndAttendance();toast('Attendance saved')}catch(err){toast(err.message,true)}};
 window.deleteAttendance=id=>confirmAction('Delete attendance record?','This attendance entry will be removed from the monthly summary.',async()=>{await api(`/api/attendance/${id}`,{method:'DELETE'});await loadPayrollAndAttendance();toast('Attendance deleted')});
 $('payrollBranch').onchange=loadPayrollAndAttendance;$('payrollMonth').onchange=loadPayrollAndAttendance;$('applyPayrollFilter').onclick=loadPayrollAndAttendance;
-$('exportPayrollBtn').onclick=()=>download(`/api/export/payroll.csv?branch=${encodeURIComponent($('payrollBranch').value)}&month=${getMonthValue('payrollMonth')}`);
-$('exportAttendanceBtn').onclick=()=>download(`/api/export/attendance.csv?branch=${encodeURIComponent($('payrollBranch').value)}&month=${getMonthValue('payrollMonth')}`);
-$('reportBudget').onclick=()=>downloadBudget();
-$('reportPayroll').onclick=()=>$('exportPayrollBtn').click();$('reportAttendance').onclick=()=>$('exportAttendanceBtn').click();
 
 async function loadNotifications(){
   if(!has('alert_read'))return;
@@ -353,7 +372,6 @@ $('viewAllNotifications').onclick=()=>{$('notificationDropdown').classList.remov
 $('markDropdownRead').onclick=async()=>{await api('/api/notifications/read',{method:'POST',body:{all:true,branch:$('globalBranch').value||'All'}});await loadNotifications();toast('All current alerts marked as read')};
 $('markAllAlertsRead').onclick=async()=>{await api('/api/notifications/read',{method:'POST',body:{all:true,branch:$('alertBranch').value||'All'}});await loadNotifications();toast('All current alerts marked as read')};
 $('refreshAlertsBtn').onclick=async()=>{await loadNotifications();toast('Alerts refreshed')};$('alertBranch').onchange=loadNotifications;$('alertSeverity').onchange=renderAlertCenter;
-$('exportAlertsBtn').onclick=()=>download(`/api/export/notifications.csv?branch=${encodeURIComponent($('alertBranch').value||'All')}`);
 $('alertSettingsBranch').onchange=async()=>{$('alertBranch').value=$('alertSettingsBranch').value;await loadNotifications()};
 $('alertSettingsForm').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target),body={branch:f.get('branch')};['membership_expiry_days','low_production_percent','attendance_reminder_hour','production_reminder_hour','payroll_reminder_day','income_lag_tolerance_percent'].forEach(k=>body[k]=Number(f.get(k)));['order_alerts','budget_alerts','membership_alerts','attendance_alerts','production_alerts','payroll_alerts'].forEach(k=>body[k]=e.target.elements[k].checked);try{await api('/api/notifications/settings',{method:'POST',body});await loadNotifications();toast('Alert settings saved')}catch(err){toast(err.message,true)}};
 
@@ -564,7 +582,6 @@ async function saveCurrentBudget({reload=true,notify=true}={}){
 $('saveBudgetBtn').onclick=async()=>{try{await saveCurrentBudget()}catch(err){toast(err.message,true)}};
 function previousMonth(month){const [y,m]=month.split('-').map(Number),d=new Date(y,m-2,1);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
 $('copyBudgetBtn').onclick=()=>{const target=getMonthValue('budgetMonth'),source=previousMonth(target),branch=$('budgetBranch').value;confirmAction('Copy previous month budget?',`Copy ${source} budget into ${target} for ${branch}? Existing unlocked target values will be replaced.`,async()=>{const d=await api('/api/budget/copy',{method:'POST',body:{source_month:source,target_month:target,branch}});await loadBudget();toast(`${d.copied} branch budget copied`)})};
-$('exportBudgetBtn').onclick=downloadBudget;function downloadBudget(){window.location=`/api/export/budget.csv?branch=${encodeURIComponent($('budgetBranch').value||'All')}&month=${encodeURIComponent(getMonthValue('budgetMonth'))}`}
 async function changeBudgetStatus(status,button){
   const branch=$('budgetBranch').value,month=getMonthValue('budgetMonth');
   if(branch==='All')return toast('Select one branch first',true);

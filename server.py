@@ -22,11 +22,13 @@ import re
 import secrets
 import shutil
 import sqlite3
+import struct
 import sys
 import threading
 import urllib.parse
 import webbrowser
 import zipfile
+import zlib
 import xml.etree.ElementTree as ET
 from datetime import datetime, timedelta
 from http import cookies
@@ -266,6 +268,436 @@ def get_owner_targets(conn: sqlite3.Connection) -> dict[str, str]:
     for field in OWNER_TARGET_FIELDS:
         targets[field] = get_setting(conn, field, DEFAULT_OWNER_TARGETS[field])
     return targets
+
+
+def profile_slug(profile: dict[str, Any]) -> str:
+    text = str(profile.get("company_name") or "company").strip().lower()
+    slug = re.sub(r"[^a-z0-9]+", "_", text).strip("_")
+    return slug or "company"
+
+
+def branch_label(branch: str | None) -> str:
+    return "All Branches" if not branch or branch == "All" else str(branch)
+
+
+def date_range_label(start: str | None, end: str | None) -> str:
+    if start and end:
+        return f"{start} to {end}"
+    return start or end or "Selected period"
+
+
+def format_report_money(value: Any, currency: str) -> str:
+    try:
+        amount = float(value or 0)
+    except (TypeError, ValueError):
+        amount = 0.0
+    return f"{currency} {amount:,.3f}"
+
+
+def format_report_number(value: Any, decimals: int = 2) -> str:
+    try:
+        number = float(value or 0)
+    except (TypeError, ValueError):
+        return str(value or "")
+    if abs(number - int(number)) < 0.000001:
+        return f"{int(number):,}"
+    return f"{number:,.{decimals}f}".rstrip("0").rstrip(".")
+
+
+def _pdf_safe_text(value: Any) -> str:
+    text = re.sub(r"\s+", " ", str(value if value is not None else "")).strip()
+    return text.encode("cp1252", "replace").decode("cp1252")
+
+
+def _pdf_literal(value: Any) -> str:
+    text = _pdf_safe_text(value)
+    return "(" + text.replace("\\", "\\\\").replace("(", "\\(").replace(")", "\\)") + ")"
+
+
+def _pdf_num(value: float) -> str:
+    return f"{value:.3f}".rstrip("0").rstrip(".")
+
+
+def _pdf_text_width(value: Any, size: float, bold: bool = False) -> float:
+    return len(_pdf_safe_text(value)) * size * (0.55 if bold else 0.50)
+
+
+def _pdf_wrap_text(value: Any, width: float, size: float, max_lines: int = 3) -> list[str]:
+    text = _pdf_safe_text(value)
+    if not text:
+        return [""]
+    max_chars = max(5, int(width / max(size * 0.48, 1)))
+    words = text.split(" ")
+    lines: list[str] = []
+    current = ""
+    for word in words:
+        if not current:
+            current = word
+        elif len(current) + 1 + len(word) <= max_chars:
+            current += " " + word
+        else:
+            lines.append(current)
+            current = word
+        while len(current) > max_chars:
+            lines.append(current[:max_chars - 1] + "-")
+            current = current[max_chars - 1:]
+    if current:
+        lines.append(current)
+    if len(lines) > max_lines:
+        lines = lines[:max_lines]
+        lines[-1] = (lines[-1][: max(0, max_chars - 3)] + "...").strip()
+    return lines or [""]
+
+
+def _jpeg_report_image(data: bytes) -> dict[str, Any] | None:
+    if not data.startswith(b"\xff\xd8"):
+        return None
+    i = 2
+    sof_markers = {0xC0, 0xC1, 0xC2, 0xC3, 0xC5, 0xC6, 0xC7, 0xC9, 0xCA, 0xCB, 0xCD, 0xCE, 0xCF}
+    while i + 8 < len(data):
+        if data[i] != 0xFF:
+            i += 1
+            continue
+        while i < len(data) and data[i] == 0xFF:
+            i += 1
+        if i >= len(data):
+            break
+        marker = data[i]
+        i += 1
+        if marker in {0x01, 0xD0, 0xD1, 0xD2, 0xD3, 0xD4, 0xD5, 0xD6, 0xD7, 0xD8, 0xD9}:
+            continue
+        if i + 2 > len(data):
+            break
+        length = int.from_bytes(data[i : i + 2], "big")
+        if length < 2 or i + length > len(data):
+            break
+        if marker in sof_markers and length >= 8:
+            bits = data[i + 2]
+            height = int.from_bytes(data[i + 3 : i + 5], "big")
+            width = int.from_bytes(data[i + 5 : i + 7], "big")
+            components = data[i + 7]
+            colorspace = "/DeviceGray" if components == 1 else "/DeviceCMYK" if components == 4 else "/DeviceRGB"
+            return {"width": width, "height": height, "bits": bits, "colorspace": colorspace, "filter": "/DCTDecode", "data": data}
+        i += length
+    return None
+
+
+def _paeth_predictor(a: int, b: int, c: int) -> int:
+    p = a + b - c
+    pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+    if pa <= pb and pa <= pc:
+        return a
+    if pb <= pc:
+        return b
+    return c
+
+
+def _png_report_image(data: bytes) -> dict[str, Any] | None:
+    if not data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return None
+    pos = 8
+    width = height = bit_depth = color_type = 0
+    palette: bytes | None = None
+    idat = bytearray()
+    while pos + 8 <= len(data):
+        length = struct.unpack(">I", data[pos : pos + 4])[0]
+        chunk_type = data[pos + 4 : pos + 8]
+        chunk_data = data[pos + 8 : pos + 8 + length]
+        pos += 12 + length
+        if chunk_type == b"IHDR":
+            width, height, bit_depth, color_type = struct.unpack(">IIBB", chunk_data[:10])
+        elif chunk_type == b"PLTE":
+            palette = chunk_data
+        elif chunk_type == b"IDAT":
+            idat.extend(chunk_data)
+        elif chunk_type == b"IEND":
+            break
+    if not width or not height or bit_depth != 8 or color_type not in {0, 2, 3, 4, 6}:
+        return None
+    channels = {0: 1, 2: 3, 3: 1, 4: 2, 6: 4}[color_type]
+    row_len = width * channels
+    try:
+        raw = zlib.decompress(bytes(idat))
+    except zlib.error:
+        return None
+    bpp = channels
+    out = bytearray()
+    prev = bytearray(row_len)
+    offset = 0
+    for _ in range(height):
+        if offset >= len(raw):
+            return None
+        filter_type = raw[offset]
+        offset += 1
+        scan = bytearray(raw[offset : offset + row_len])
+        offset += row_len
+        if len(scan) != row_len:
+            return None
+        recon = bytearray(row_len)
+        for i, value in enumerate(scan):
+            left = recon[i - bpp] if i >= bpp else 0
+            above = prev[i]
+            upper_left = prev[i - bpp] if i >= bpp else 0
+            if filter_type == 0:
+                recon[i] = value
+            elif filter_type == 1:
+                recon[i] = (value + left) & 0xFF
+            elif filter_type == 2:
+                recon[i] = (value + above) & 0xFF
+            elif filter_type == 3:
+                recon[i] = (value + ((left + above) // 2)) & 0xFF
+            elif filter_type == 4:
+                recon[i] = (value + _paeth_predictor(left, above, upper_left)) & 0xFF
+            else:
+                return None
+        if color_type == 2:
+            out.extend(recon)
+        elif color_type == 6:
+            for i in range(0, len(recon), 4):
+                out.extend(recon[i : i + 3])
+        elif color_type == 0:
+            for gray in recon:
+                out.extend((gray, gray, gray))
+        elif color_type == 4:
+            for i in range(0, len(recon), 2):
+                gray = recon[i]
+                out.extend((gray, gray, gray))
+        elif color_type == 3:
+            if not palette:
+                return None
+            for idx in recon:
+                p = idx * 3
+                out.extend(palette[p : p + 3] if p + 3 <= len(palette) else b"\x00\x00\x00")
+        prev = recon
+    return {"width": width, "height": height, "bits": 8, "colorspace": "/DeviceRGB", "filter": "/FlateDecode", "data": zlib.compress(bytes(out))}
+
+
+def parse_report_image(data: bytes, mime: str) -> dict[str, Any] | None:
+    mime = (mime or "").lower()
+    if "jpeg" in mime or "jpg" in mime:
+        return _jpeg_report_image(data)
+    if "png" in mime:
+        return _png_report_image(data)
+    return None
+
+
+class PdfReportDocument:
+    width = 842.0
+    height = 595.0
+    margin = 34.0
+    body_top = 430.0
+    footer_top = 68.0
+
+    def __init__(self, title: str, profile: dict[str, Any], branch: str, period: str, logo: dict[str, Any] | None = None):
+        self.title = title
+        self.profile = profile
+        self.branch = branch_label(branch)
+        self.period = period
+        self.currency = str(profile.get("currency_label") or DEFAULT_COMPANY_PROFILE["currency_label"]).strip() or DEFAULT_COMPANY_PROFILE["currency_label"]
+        self.generated = now_iso()
+        self.logo = logo
+        self.pages: list[list[str]] = []
+        self.y = self.body_top
+
+    def add_page(self) -> None:
+        self.pages.append([])
+        self.y = self.body_top
+
+    @property
+    def ops(self) -> list[str]:
+        if not self.pages:
+            self.add_page()
+        return self.pages[-1]
+
+    def rect(self, x: float, y: float, w: float, h: float, fill: str = "1 1 1", stroke: str | None = None) -> None:
+        op = f"q {fill} rg {_pdf_num(x)} {_pdf_num(y)} {_pdf_num(w)} {_pdf_num(h)} re f Q"
+        self.ops.append(op)
+        if stroke:
+            self.ops.append(f"q {stroke} RG 0.6 w {_pdf_num(x)} {_pdf_num(y)} {_pdf_num(w)} {_pdf_num(h)} re S Q")
+
+    def text(self, x: float, y: float, value: Any, size: float = 8, bold: bool = False, color: str = "0.09 0.13 0.20", align: str = "left") -> None:
+        text = _pdf_safe_text(value)
+        if align == "right":
+            x -= _pdf_text_width(text, size, bold)
+        elif align == "center":
+            x -= _pdf_text_width(text, size, bold) / 2
+        font = "/F2" if bold else "/F1"
+        self.ops.append(f"BT {color} rg {font} {_pdf_num(size)} Tf {_pdf_num(x)} {_pdf_num(y)} Td {_pdf_literal(text)} Tj ET")
+
+    def add_summary(self, items: list[tuple[str, str]]) -> None:
+        if not items:
+            return
+        if self.y - 46 < self.footer_top:
+            self.add_page()
+        usable = self.width - 2 * self.margin
+        cols = min(4, max(1, len(items)))
+        gap = 8.0
+        card_w = (usable - gap * (cols - 1)) / cols
+        row_h = 42.0
+        for idx, (label, value) in enumerate(items[:4]):
+            x = self.margin + idx * (card_w + gap)
+            y = self.y - row_h
+            self.ops.append(f"q 0.96 0.97 0.98 rg {_pdf_num(x)} {_pdf_num(y)} {_pdf_num(card_w)} {_pdf_num(row_h)} re f Q")
+            self.ops.append(f"q 0.82 0.72 0.47 RG 0.7 w {_pdf_num(x)} {_pdf_num(y)} {_pdf_num(card_w)} {_pdf_num(row_h)} re S Q")
+            self.text(x + 8, y + 25, label.upper(), 6.4, bold=True, color="0.45 0.49 0.55")
+            self.text(x + 8, y + 10, value, 10.5, bold=True, color="0.06 0.10 0.17")
+        self.y -= row_h + 14
+
+    def _draw_table_header(self, headers: list[str], widths: list[float], x0: float, font_size: float) -> None:
+        header_h = 22.0
+        if self.y - header_h < self.footer_top:
+            self.add_page()
+        self.ops.append(f"q 0.07 0.12 0.19 rg {_pdf_num(x0)} {_pdf_num(self.y - header_h)} {_pdf_num(sum(widths))} {_pdf_num(header_h)} re f Q")
+        x = x0
+        for idx, header in enumerate(headers):
+            lines = _pdf_wrap_text(header, widths[idx] - 8, font_size, 2)
+            for line_idx, line in enumerate(lines):
+                self.text(x + 4, self.y - 9 - line_idx * (font_size + 1.2), line, font_size, bold=True, color="1 1 1")
+            x += widths[idx]
+        self.y -= header_h
+
+    def add_table(self, headers: list[str], rows: list[list[Any]], widths: list[float] | None = None,
+                  aligns: list[str] | None = None, totals: list[list[Any]] | None = None) -> None:
+        if not self.pages:
+            self.add_page()
+        usable = self.width - 2 * self.margin
+        col_count = len(headers)
+        if widths:
+            total = sum(widths)
+            widths = [w / total * usable for w in widths]
+        else:
+            widths = [usable / col_count for _ in headers]
+        aligns = aligns or ["left"] * col_count
+        font_size = 7.1 if col_count <= 10 else 6.3 if col_count <= 14 else 5.7
+        line_h = font_size + 2.2
+        x0 = self.margin
+        self._draw_table_header(headers, widths, x0, font_size)
+        all_rows = [(row, False) for row in rows] + [(row, True) for row in (totals or [])]
+        if not all_rows:
+            all_rows = [(["No rows found for this filter."] + [""] * (col_count - 1), False)]
+        for idx, (row, is_total) in enumerate(all_rows):
+            cell_lines = [_pdf_wrap_text(row[i] if i < len(row) else "", widths[i] - 8, font_size, 3) for i in range(col_count)]
+            row_h = max(20.0, max(len(lines) for lines in cell_lines) * line_h + 8)
+            if self.y - row_h < self.footer_top:
+                self.add_page()
+                self._draw_table_header(headers, widths, x0, font_size)
+            fill = "0.98 0.96 0.89" if is_total else "0.985 0.988 0.992" if idx % 2 else "1 1 1"
+            self.ops.append(f"q {fill} rg {_pdf_num(x0)} {_pdf_num(self.y - row_h)} {_pdf_num(usable)} {_pdf_num(row_h)} re f Q")
+            row_line_y = self.y - row_h
+            self.ops.append(f"q 0.86 0.88 0.90 RG 0.35 w {_pdf_num(x0)} {_pdf_num(row_line_y)} m {_pdf_num(x0 + usable)} {_pdf_num(row_line_y)} l S Q")
+            x = x0
+            for col, lines in enumerate(cell_lines):
+                for line_idx, line in enumerate(lines):
+                    baseline = self.y - 12 - line_idx * line_h
+                    if aligns[col] == "right":
+                        self.text(x + widths[col] - 4, baseline, line, font_size, bold=is_total, color="0.08 0.11 0.16", align="right")
+                    else:
+                        self.text(x + 4, baseline, line, font_size, bold=is_total, color="0.08 0.11 0.16")
+                x += widths[col]
+            self.y -= row_h
+
+    def _header_ops(self) -> list[str]:
+        ops: list[str] = []
+        old_pages = self.pages
+        self.pages = [ops]
+        logo_x, logo_y, logo_w, logo_h = self.margin, 516.0, 58.0, 42.0
+        if self.logo:
+            aspect = max(0.1, float(self.logo["width"]) / max(1.0, float(self.logo["height"])))
+            draw_w = min(62.0, logo_h * aspect)
+            draw_h = min(44.0, draw_w / aspect)
+            ops.append(f"q {_pdf_num(draw_w)} 0 0 {_pdf_num(draw_h)} {_pdf_num(logo_x)} {_pdf_num(logo_y)} cm /Im1 Do Q")
+        else:
+            ops.append(f"q 0.96 0.97 0.98 rg {_pdf_num(logo_x)} {_pdf_num(logo_y)} {_pdf_num(logo_h)} {_pdf_num(logo_h)} re f Q")
+            ops.append(f"q 0.67 0.54 0.28 RG 0.9 w {_pdf_num(logo_x)} {_pdf_num(logo_y)} {_pdf_num(logo_h)} {_pdf_num(logo_h)} re S Q")
+            self.text(logo_x + logo_h / 2, logo_y + 15, "N", 14, bold=True, color="0.67 0.54 0.28", align="center")
+        text_x = self.margin + 74
+        company = self.profile.get("company_name") or "Company Dashboard"
+        subtitle = self.profile.get("company_subtitle") or "Management Report"
+        contacts = [self.profile.get("company_phone"), self.profile.get("company_email"), self.profile.get("company_address"), self.profile.get("company_website")]
+        contact = " | ".join(str(x).strip() for x in contacts if str(x or "").strip())
+        self.text(text_x, 548, company, 14, bold=True, color="0.06 0.10 0.17")
+        self.text(text_x, 532, subtitle, 8.5, color="0.36 0.40 0.46")
+        if contact:
+            for line_idx, line in enumerate(_pdf_wrap_text(contact, 340, 7, 2)):
+                self.text(text_x, 516 - line_idx * 10, line, 7, color="0.38 0.43 0.49")
+        right = self.width - self.margin
+        self.text(right, 548, self.title, 17, bold=True, color="0.06 0.10 0.17", align="right")
+        meta = [("Branch", self.branch), ("Period", self.period), ("Generated", self.generated), ("Currency", self.currency)]
+        y = 528.0
+        for label, value in meta:
+            self.text(right - 155, y, label.upper(), 6.4, bold=True, color="0.50 0.53 0.58")
+            self.text(right, y, value, 7.4, color="0.18 0.22 0.28", align="right")
+            y -= 11
+        ops.append(f"q 0.07 0.12 0.19 RG 1.2 w {_pdf_num(self.margin)} 485 m {_pdf_num(self.width - self.margin)} 485 l S Q")
+        ops.append(f"q 0.79 0.65 0.35 RG 2.4 w {_pdf_num(self.margin)} 481 m {_pdf_num(self.margin + 135)} 481 l S Q")
+        self.pages = old_pages
+        return ops
+
+    def _footer_ops(self, page: int, total: int) -> list[str]:
+        ops: list[str] = []
+        old_pages = self.pages
+        self.pages = [ops]
+        y = 34.0
+        ops.append(f"q 0.84 0.86 0.89 RG 0.6 w {_pdf_num(self.margin)} 52 m {_pdf_num(self.width - self.margin)} 52 l S Q")
+        self.text(self.margin, y, "Powered by Nexa Business Solutions", 7.4, bold=True, color="0.37 0.30 0.17")
+        contact = str(self.profile.get("company_website") or self.profile.get("company_email") or self.profile.get("company_phone") or "").strip()
+        if contact:
+            self.text(self.width / 2, y, contact, 7.0, color="0.38 0.43 0.49", align="center")
+        self.text(self.width - self.margin, y, f"Page {page} of {total}", 7.4, color="0.38 0.43 0.49", align="right")
+        self.pages = old_pages
+        return ops
+
+    def build(self) -> bytes:
+        if not self.pages:
+            self.add_page()
+        objects: list[bytes] = []
+
+        def add_object(body: bytes) -> int:
+            objects.append(body)
+            return len(objects)
+
+        font_regular = add_object(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>")
+        font_bold = add_object(b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>")
+        image_obj = None
+        if self.logo:
+            img = self.logo
+            image_body = (
+                f"<< /Type /XObject /Subtype /Image /Width {int(img['width'])} /Height {int(img['height'])} "
+                f"/ColorSpace {img['colorspace']} /BitsPerComponent {int(img.get('bits') or 8)} /Filter {img['filter']} "
+                f"/Length {len(img['data'])} >>\nstream\n"
+            ).encode("latin-1") + img["data"] + b"\nendstream"
+            image_obj = add_object(image_body)
+        pages_obj = add_object(b"")
+        page_ids: list[int] = []
+        total_pages = len(self.pages)
+        resources = f"<< /Font << /F1 {font_regular} 0 R /F2 {font_bold} 0 R >>"
+        if image_obj:
+            resources += f" /XObject << /Im1 {image_obj} 0 R >>"
+        resources += " >>"
+        for idx, body_ops in enumerate(self.pages, start=1):
+            stream_text = "\n".join(self._header_ops() + body_ops + self._footer_ops(idx, total_pages))
+            stream = stream_text.encode("latin-1", "replace")
+            content_obj = add_object(f"<< /Length {len(stream)} >>\nstream\n".encode("latin-1") + stream + b"\nendstream")
+            page_obj = add_object(
+                f"<< /Type /Page /Parent {pages_obj} 0 R /MediaBox [0 0 {_pdf_num(self.width)} {_pdf_num(self.height)}] "
+                f"/Resources {resources} /Contents {content_obj} 0 R >>".encode("latin-1")
+            )
+            page_ids.append(page_obj)
+        objects[pages_obj - 1] = f"<< /Type /Pages /Kids [{' '.join(f'{p} 0 R' for p in page_ids)}] /Count {len(page_ids)} >>".encode("latin-1")
+        catalog_obj = add_object(f"<< /Type /Catalog /Pages {pages_obj} 0 R >>".encode("latin-1"))
+        pdf = bytearray(b"%PDF-1.4\n%\xe2\xe3\xcf\xd3\n")
+        offsets = [0]
+        for idx, body in enumerate(objects, start=1):
+            offsets.append(len(pdf))
+            pdf.extend(f"{idx} 0 obj\n".encode("latin-1"))
+            pdf.extend(body)
+            pdf.extend(b"\nendobj\n")
+        xref = len(pdf)
+        pdf.extend(f"xref\n0 {len(objects) + 1}\n0000000000 65535 f \n".encode("latin-1"))
+        for offset in offsets[1:]:
+            pdf.extend(f"{offset:010d} 00000 n \n".encode("latin-1"))
+        pdf.extend(f"trailer\n<< /Size {len(objects) + 1} /Root {catalog_obj} 0 R >>\nstartxref\n{xref}\n%%EOF".encode("latin-1"))
+        return bytes(pdf)
 
 
 def month_name(month_key: str) -> str:
@@ -1294,24 +1726,44 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.handle_users(user)
             elif path == "/api/export/finance.csv":
                 self.handle_export_finance(user)
+            elif path == "/api/export/finance.pdf":
+                self.handle_export_finance_pdf(user)
             elif path == "/api/export/production.csv":
                 self.handle_export_production(user)
+            elif path == "/api/export/production.pdf":
+                self.handle_export_production_pdf(user)
             elif path == "/api/export/orders.csv":
                 self.handle_export_orders(user)
+            elif path == "/api/export/orders.pdf":
+                self.handle_export_orders_pdf(user)
             elif path == "/api/export/membership.csv":
                 self.handle_export_membership(user)
+            elif path == "/api/export/membership.pdf":
+                self.handle_export_membership_pdf(user)
             elif path == "/api/export/membership_commissions.csv":
                 self.handle_export_membership_commissions(user)
+            elif path == "/api/export/membership_commissions.pdf":
+                self.handle_export_membership_commissions_pdf(user)
             elif path == "/api/export/budget.csv":
                 self.handle_export_budget(user)
+            elif path == "/api/export/budget.pdf":
+                self.handle_export_budget_pdf(user)
             elif path == "/api/export/notifications.csv":
                 self.handle_export_notifications(user)
+            elif path == "/api/export/notifications.pdf":
+                self.handle_export_notifications_pdf(user)
             elif path == "/api/export/payroll.csv":
                 self.handle_export_payroll(user)
+            elif path == "/api/export/payroll.pdf":
+                self.handle_export_payroll_pdf(user)
             elif path == "/api/export/attendance.csv":
                 self.handle_export_attendance(user)
+            elif path == "/api/export/attendance.pdf":
+                self.handle_export_attendance_pdf(user)
             elif path == "/api/export/pos-sales.csv":
                 self.handle_export_pos_sales(user)
+            elif path == "/api/export/pos-sales.pdf":
+                self.handle_export_pos_sales_pdf(user)
             elif path == "/api/backup":
                 self.handle_backup(user)
             else:
@@ -2340,12 +2792,13 @@ class AppHandler(BaseHTTPRequestHandler):
                 COALESCE((SELECT SUM(fe.amount) FROM finance_entries fe WHERE fe.type='Expense' AND fe.branch=bp.branch AND lower(fe.category)=lower(ec.name) AND fe.date BETWEEN ? AND ?),0) actual
                 FROM budget_plans bp JOIN budget_items bi ON bi.plan_id=bp.id JOIN expense_categories ec ON ec.id=bi.category_id
                 WHERE bp.month_key=? {branch_filter} ORDER BY bp.branch,ec.name""",[start,end,*params]))
-        headers=["Month","Branch","Status","Category","Budget","Actual","Remaining","Used %","Warning %","Notes"]
+        currency = self.report_currency()
+        headers=["Month","Branch","Status","Category",f"Budget ({currency})",f"Actual ({currency})",f"Remaining ({currency})","Used %","Warning %","Notes"]
         out=[]
         for r in rows:
             used=float(r["actual"] or 0)/float(r["budget_amount"] or 1)*100 if r["budget_amount"] else (100 if r["actual"] else 0)
             out.append([r["month_key"],r["branch"],r["status"],r["category"],r["budget_amount"],r["actual"],float(r["budget_amount"])-float(r["actual"]),round(used,1),r["warning_percent"],r["notes"]])
-        self.send_csv(f"dar_al_sultan_budget_vs_actual_{month}.csv",headers,out)
+        self.send_csv(self.export_filename(f"budget_vs_actual_{month}", "csv"),headers,out)
 
     def handle_payroll_list(self, user: dict[str, Any]) -> None:
         if not self.require_permission(user, "payroll_read"):
@@ -2513,9 +2966,10 @@ class AppHandler(BaseHTTPRequestHandler):
         with db_connect() as conn:
             rows=list(conn.execute(f"""SELECT pr.*,e.name,e.role FROM payroll_records pr JOIN employees e ON e.id=pr.employee_id
                 WHERE {where} ORDER BY pr.branch,e.name""",params))
-        headers=["Month","Branch","Employee","Designation","Basic Salary","Commission","Bonus","OT Hours","OT Amount","Other Allowance","Advance Deduction","Other Deductions","Net Salary","Status","Notes"]
+        currency = self.report_currency()
+        headers=["Month","Branch","Employee","Designation",f"Basic Salary ({currency})",f"Commission ({currency})",f"Bonus ({currency})","OT Hours",f"OT Amount ({currency})",f"Other Allowance ({currency})",f"Advance Deduction ({currency})",f"Other Deductions ({currency})",f"Net Salary ({currency})","Status","Notes"]
         out=[[r["month_key"],r["branch"],r["name"],r["role"],r["basic_salary"],r["commission"],r["bonus"],r["overtime_hours"],r["overtime_amount"],r["other_allowance"],r["advance_deduction"],r["other_deductions"],r["net_salary"],r["status"],r["notes"]] for r in rows]
-        self.send_csv(f"dar_al_sultan_payroll_{month}.csv",headers,out)
+        self.send_csv(self.export_filename(f"payroll_{month}", "csv"),headers,out)
 
     def handle_export_attendance(self, user: dict[str, Any]) -> None:
         if not self.require_permission(user,"attendance_read"): return
@@ -2528,7 +2982,7 @@ class AppHandler(BaseHTTPRequestHandler):
                 WHERE {where} ORDER BY a.date,e.name""",params))
         headers=["Date","Branch","Employee","Designation","Status","Notes","Entered By"]
         out=[[r["date"],r["branch"],r["name"],r["role"],r["status"],r["notes"],r["entered_by"]] for r in rows]
-        self.send_csv(f"dar_al_sultan_attendance_{month}.csv",headers,out)
+        self.send_csv(self.export_filename(f"attendance_{month}", "csv"),headers,out)
 
     def order_filters(self, user: dict[str, Any]) -> tuple[str, list[Any]]:
         q = self.query()
@@ -3106,9 +3560,10 @@ class AppHandler(BaseHTTPRequestHandler):
                 LEFT JOIN employees e ON e.id=mc.sales_agent_id {where}
                 ORDER BY mc.issue_date,mc.id""", params
             ))
-        headers = ["Card No","Customer","Phone","Plan","Branch","Issue Date","Expiry Date","Status","Opening Balance","Current Balance","Sale Price","Payment Method","Sales Agent","Commission Rate %","Commission Amount","Notes"]
+        currency = self.report_currency()
+        headers = ["Card No","Customer","Phone","Plan","Branch","Issue Date","Expiry Date","Status",f"Opening Balance ({currency})",f"Current Balance ({currency})",f"Sale Price ({currency})","Payment Method","Sales Agent","Commission Rate %",f"Commission Amount ({currency})","Notes"]
         out = [[r["card_no"],r["customer_name"],r["phone"],r["plan_name"],r["branch"],r["issue_date"],r["expiry_date"],r["status"],r["opening_balance"],r["current_balance"],r["sale_price"],r["payment_method"],r["sales_agent_display"] or "Direct sale / no agent",r["commission_rate"],r["commission_amount"],r["notes"]] for r in rows]
-        self.send_csv("dar_al_sultan_membership_cards.csv", headers, out)
+        self.send_csv(self.export_filename("membership_cards", "csv"), headers, out)
 
     def membership_commission_filters(self, user: dict[str, Any]) -> tuple[str, list[Any], str, str]:
         q = self.query()
@@ -3161,9 +3616,10 @@ class AppHandler(BaseHTTPRequestHandler):
                 GROUP BY COALESCE(CAST(mc.sales_agent_id AS TEXT),'manual:'||lower(mc.sales_agent_name)),COALESCE(e.name,mc.sales_agent_name),COALESCE(e.role,'Manual Sales Agent'),mc.branch
                 ORDER BY total_commission DESC,sales_agent""", params
             ))
-        headers = ["Month","Branch","Sales Agent","Designation","Cards Sold","Card Sales","Commission"]
+        currency = self.report_currency()
+        headers = ["Month","Branch","Sales Agent","Designation","Cards Sold",f"Card Sales ({currency})",f"Commission ({currency})"]
         out = [[month,r["branch"],r["sales_agent"],r["designation"],r["cards_sold"],r["total_sales"],r["total_commission"]] for r in rows]
-        self.send_csv(f"dar_al_sultan_card_commission_{month}.csv", headers, out)
+        self.send_csv(self.export_filename(f"card_commission_{month}", "csv"), headers, out)
 
     def production_filters(self, user: dict[str, Any]) -> tuple[str, list[Any]]:
         q = self.query()
@@ -4054,9 +4510,10 @@ class AppHandler(BaseHTTPRequestHandler):
         where,params,_=self.pos_sales_filters(user)
         with db_connect() as conn:
             rows=conn.execute(f"SELECT * FROM pos_sales ps {where} ORDER BY sale_datetime DESC,id DESC",params).fetchall()
-        headers=["Date & Time","Invoice No.","Branch","Customer","Contact Number","Location","Payment Status","Payment Method","Total Amount","Total Paid","Sell Due","Return Due","Total Items","Added By","Sell Note","Staff Note","Shipping Status","Shipping Details","Source File"]
         out=[[r["sale_datetime"],r["invoice_no"],r["branch"],r["customer_name"],r["contact_number"],r["location"],r["payment_status"],r["payment_method"],r["total_amount"],r["total_paid"],r["sell_due"],r["sell_return_due"],r["total_items"],r["added_by"],r["sell_note"],r["staff_note"],r["shipping_status"],r["shipping_details"],r["source_file"]] for r in rows]
-        self.send_csv("dar_al_sultan_sales_record.csv",headers,out)
+        currency = self.report_currency()
+        headers=["Date & Time","Invoice No.","Branch","Customer","Contact Number","Location","Payment Status","Payment Method",f"Total Amount ({currency})",f"Total Paid ({currency})",f"Sell Due ({currency})",f"Return Due ({currency})","Total Items","Added By","Sell Note","Staff Note","Shipping Status","Shipping Details","Source File"]
+        self.send_csv(self.export_filename("sales_record", "csv"),headers,out)
 
     def handle_finance_list(self, user: dict[str, Any]) -> None:
         if not self.require_permission(user,"finance_read"):return
@@ -4383,7 +4840,7 @@ class AppHandler(BaseHTTPRequestHandler):
             return
         q=self.query(); branch=q.get("branch",["All"])[0]
         data=self.build_notifications(user,branch)
-        self.send_csv("dar_al_sultan_management_alerts.csv",
+        self.send_csv(self.export_filename("management_alerts", "csv"),
                       ["Severity","Type","Branch","Title","Message","Metric","Read","Date"],
                       [[a["severity"],a["type"],a["branch"],a["title"],a["message"],a["metric"],"Yes" if a["read"] else "No",a["created_label"]] for a in data["alerts"]])
 
@@ -4483,6 +4940,395 @@ class AppHandler(BaseHTTPRequestHandler):
             log_audit(conn,user,"UPDATE","Users",user_id,f"Updated {existing['username']} | {role} | active={active}")
         self.send_json({"ok":True})
 
+    def report_currency(self) -> str:
+        with db_connect() as conn:
+            profile = get_company_profile(conn)
+        return str(profile.get("currency_label") or DEFAULT_COMPANY_PROFILE["currency_label"]).strip() or DEFAULT_COMPANY_PROFILE["currency_label"]
+
+    def export_filename(self, stem: str, ext: str, profile: dict[str, Any] | None = None) -> str:
+        if profile is None:
+            with db_connect() as conn:
+                profile = get_company_profile(conn)
+        return f"{profile_slug(profile)}_{stem}.{ext}"
+
+    def report_logo(self, conn: sqlite3.Connection) -> dict[str, Any] | None:
+        data_b64 = get_setting(conn, "company_logo_data", "")
+        mime = get_setting(conn, "company_logo_mime", "")
+        if not data_b64 or not mime:
+            return None
+        try:
+            raw = base64.b64decode(data_b64)
+        except Exception:
+            return None
+        return parse_report_image(raw, mime)
+
+    def send_report_pdf(self, stem: str, title: str, branch: str, period: str, headers: list[str],
+                        rows: list[list[Any]], widths: list[float] | None = None,
+                        aligns: list[str] | None = None, totals: list[list[Any]] | None = None,
+                        summary: list[tuple[str, str]] | None = None) -> None:
+        with db_connect() as conn:
+            profile = get_company_profile(conn)
+            logo = self.report_logo(conn)
+        pdf = PdfReportDocument(title, profile, branch, period, logo)
+        pdf.add_summary(summary or [])
+        pdf.add_table(headers, rows, widths=widths, aligns=aligns, totals=totals)
+        self.send_attachment(self.export_filename(stem, "pdf", profile), "application/pdf", pdf.build())
+
+    def handle_export_finance_pdf(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "finance_read"):
+            return
+        q = self.query()
+        branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
+        default_start, default_end = current_month_range()
+        start = q.get("start", [default_start])[0] or default_start
+        end = q.get("end", [default_end])[0] or default_end
+        sql = "SELECT * FROM finance_entries WHERE date BETWEEN ? AND ?"
+        params: list[Any] = [start, end]
+        if branch != "All":
+            sql += " AND branch=?"; params.append(branch)
+        sql += " ORDER BY date,id"
+        with db_connect() as conn:
+            rs = list(conn.execute(sql, params))
+            currency = get_company_profile(conn)["currency_label"]
+        rows = [[r["date"], r["branch"], r["type"], r["category"], r["description"], r["payment_method"], r["reference"], format_report_money(r["amount"], currency)] for r in rs]
+        income = sum(float(r["amount"] or 0) for r in rs if r["type"] == "Income")
+        expense = sum(float(r["amount"] or 0) for r in rs if r["type"] == "Expense")
+        totals = [
+            ["", "", "", "", "", "", "Income", format_report_money(income, currency)],
+            ["", "", "", "", "", "", "Expenses", format_report_money(expense, currency)],
+            ["", "", "", "", "", "", "Net Position", format_report_money(income - expense, currency)],
+        ]
+        self.send_report_pdf(
+            f"financial_entries_{start}_to_{end}", "Financial Report", branch, date_range_label(start, end),
+            ["Date", "Branch", "Type", "Category", "Description", "Payment", "Reference", f"Amount ({currency})"],
+            rows, widths=[0.9, 1.0, 0.8, 1.0, 2.0, 1.0, 1.1, 1.1],
+            aligns=["left", "left", "left", "left", "left", "left", "left", "right"], totals=totals,
+            summary=[("Transactions", str(len(rows))), ("Income", format_report_money(income, currency)),
+                     ("Expenses", format_report_money(expense, currency)), ("Net Position", format_report_money(income - expense, currency))],
+        )
+
+    def handle_export_production_pdf(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "production_read"):
+            return
+        q = self.query()
+        branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
+        default_start, default_end = current_month_range()
+        start = q.get("start", [default_start])[0] or default_start
+        end = q.get("end", [default_end])[0] or default_end
+        where, params = self.production_filters(user)
+        with db_connect() as conn:
+            rs = list(conn.execute(f"SELECT p.*,e.name employee FROM production_entries p JOIN employees e ON e.id=p.employee_id {where} ORDER BY p.date,p.id", params))
+        rows = [[r["date"], r["branch"], r["employee"], r["activity"], format_report_number(r["quantity"]), format_report_number(r["ready_pcs"]), format_report_number(r["ot_hours"]), r["notes"], r["entered_by"]] for r in rs]
+        quantity = sum(float(r["quantity"] or 0) for r in rs)
+        ready = sum(float(r["ready_pcs"] or 0) for r in rs)
+        ot_hours = sum(float(r["ot_hours"] or 0) for r in rs)
+        totals = [["", "", "Totals", "", format_report_number(quantity), format_report_number(ready), format_report_number(ot_hours), "", ""]]
+        self.send_report_pdf(
+            f"production_entries_{start}_to_{end}", "Production Report", branch, date_range_label(start, end),
+            ["Date", "Branch", "Employee", "Activity", "Quantity", "Ready Pcs", "OT Hours", "Notes", "Entered By"],
+            rows, widths=[0.9, 1.0, 1.3, 1.0, 0.8, 0.8, 0.7, 1.7, 1.0],
+            aligns=["left", "left", "left", "left", "right", "right", "right", "left", "left"], totals=totals,
+            summary=[("Entries", str(len(rows))), ("Quantity", format_report_number(quantity)),
+                     ("Ready Pcs", format_report_number(ready)), ("OT Hours", format_report_number(ot_hours))],
+        )
+
+    def handle_export_orders_pdf(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "orders_read"):
+            return
+        q = self.query()
+        branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
+        default_start, default_end = current_month_range()
+        start = q.get("start", [default_start])[0] or default_start
+        end = q.get("end", [default_end])[0] or default_end
+        where, params = self.order_filters(user)
+        with db_connect() as conn:
+            rs = list(conn.execute(
+                f"""SELECT o.*,e.name assigned_employee FROM customer_orders o
+                LEFT JOIN employees e ON e.id=o.assigned_employee_id {where}
+                ORDER BY o.booking_date,o.id""", params
+            ))
+            currency = get_company_profile(conn)["currency_label"]
+        can_finance = self.has_permission(user, "finance_read")
+        headers = ["Order", "Booking", "Due", "Customer", "Phone", "Branch", "Item / Qty", "Assigned", "Status"]
+        widths = [0.9, 0.8, 0.8, 1.3, 0.9, 0.9, 1.1, 1.1, 1.0]
+        aligns = ["left"] * len(headers)
+        if can_finance:
+            headers += [f"Total ({currency})", f"Advance ({currency})", f"Balance ({currency})"]
+            widths += [0.9, 0.9, 0.9]
+            aligns += ["right", "right", "right"]
+        rows = []
+        for r in rs:
+            line = [r["order_no"], r["booking_date"], r["due_date"], r["customer_name"], r["phone"], r["branch"], f"{r['item_type']} x {r['quantity']}", r["assigned_employee"] or "Unassigned", r["status"]]
+            if can_finance:
+                line += [format_report_money(r["total_amount"], currency), format_report_money(r["advance_amount"], currency), format_report_money(float(r["total_amount"] or 0) - float(r["advance_amount"] or 0), currency)]
+            rows.append(line)
+        totals = []
+        if can_finance:
+            total = sum(float(r["total_amount"] or 0) for r in rs)
+            advance = sum(float(r["advance_amount"] or 0) for r in rs)
+            totals = [["", "", "", "", "", "", "Totals", "", "", format_report_money(total, currency), format_report_money(advance, currency), format_report_money(total - advance, currency)]]
+        summary = [("Orders", str(len(rows))), ("Delivered", str(sum(1 for r in rs if r["status"] == "Delivered"))),
+                   ("Pending", str(sum(1 for r in rs if r["status"] not in ("Delivered", "Cancelled"))))]
+        if can_finance:
+            summary.append(("Balance", format_report_money(sum(float(r["total_amount"] or 0) - float(r["advance_amount"] or 0) for r in rs), currency)))
+        self.send_report_pdf(
+            f"orders_{start}_to_{end}", "Orders Report", branch, date_range_label(start, end),
+            headers, rows, widths=widths, aligns=aligns, totals=totals, summary=summary,
+        )
+
+    def handle_export_membership_pdf(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "membership_read"):
+            return
+        q = self.query()
+        branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
+        status = q.get("status", ["All"])[0]
+        where, params = self.membership_filters(user)
+        with db_connect() as conn:
+            rs = list(conn.execute(
+                f"""SELECT mc.*,c.name customer_name,c.phone,mp.name plan_name,COALESCE(e.name,NULLIF(mc.sales_agent_name,'')) sales_agent_display
+                FROM membership_cards mc JOIN customers c ON c.id=mc.customer_id
+                JOIN membership_plans mp ON mp.id=mc.plan_id
+                LEFT JOIN employees e ON e.id=mc.sales_agent_id {where}
+                ORDER BY mc.issue_date,mc.id""", params
+            ))
+            currency = get_company_profile(conn)["currency_label"]
+        headers = ["Card No", "Customer", "Phone", "Plan", "Branch", "Issue", "Expiry", "Status", f"Opening ({currency})", f"Current ({currency})", f"Sale ({currency})", "Sales Agent", f"Commission ({currency})"]
+        rows = [[r["card_no"], r["customer_name"], r["phone"], r["plan_name"], r["branch"], r["issue_date"], r["expiry_date"], r["status"],
+                 format_report_money(r["opening_balance"], currency), format_report_money(r["current_balance"], currency), format_report_money(r["sale_price"], currency),
+                 r["sales_agent_display"] or "Direct sale", format_report_money(r["commission_amount"], currency)] for r in rs]
+        totals = [["", "", "", "", "", "", "", "Totals", format_report_money(sum(float(r["opening_balance"] or 0) for r in rs), currency),
+                   format_report_money(sum(float(r["current_balance"] or 0) for r in rs), currency), format_report_money(sum(float(r["sale_price"] or 0) for r in rs), currency),
+                   "", format_report_money(sum(float(r["commission_amount"] or 0) for r in rs), currency)]]
+        self.send_report_pdf(
+            "membership_cards", "Customer / Member Report", branch, f"Status: {status}",
+            headers, rows, widths=[0.9, 1.2, 0.8, 1.0, 0.8, 0.8, 0.8, 0.8, 0.9, 0.9, 0.9, 1.1, 0.9],
+            aligns=["left", "left", "left", "left", "left", "left", "left", "left", "right", "right", "right", "left", "right"],
+            totals=totals,
+            summary=[("Cards", str(len(rows))), ("Active", str(sum(1 for r in rs if r["status"] == "Active"))),
+                     ("Wallet Balance", format_report_money(sum(float(r["current_balance"] or 0) for r in rs), currency)),
+                     ("Card Sales", format_report_money(sum(float(r["sale_price"] or 0) for r in rs), currency))],
+        )
+
+    def handle_export_membership_commissions_pdf(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "membership_read"):
+            return
+        where, params, branch, month = self.membership_commission_filters(user)
+        with db_connect() as conn:
+            rs = list(conn.execute(
+                f"""SELECT COALESCE(e.name,NULLIF(mc.sales_agent_name,'')) sales_agent,
+                COALESCE(e.role,'Manual Sales Agent') designation,mc.branch,COUNT(mc.id) cards_sold,
+                COALESCE(SUM(mc.sale_price),0) total_sales,COALESCE(SUM(mc.commission_amount),0) total_commission
+                FROM membership_cards mc LEFT JOIN employees e ON e.id=mc.sales_agent_id
+                {where} AND TRIM(COALESCE(e.name,mc.sales_agent_name,''))<>''
+                GROUP BY COALESCE(CAST(mc.sales_agent_id AS TEXT),'manual:'||lower(mc.sales_agent_name)),COALESCE(e.name,mc.sales_agent_name),COALESCE(e.role,'Manual Sales Agent'),mc.branch
+                ORDER BY total_commission DESC,sales_agent""", params
+            ))
+            currency = get_company_profile(conn)["currency_label"]
+        rows = [[month, r["branch"], r["sales_agent"], r["designation"], format_report_number(r["cards_sold"]), format_report_money(r["total_sales"], currency), format_report_money(r["total_commission"], currency)] for r in rs]
+        total_sales = sum(float(r["total_sales"] or 0) for r in rs)
+        total_commission = sum(float(r["total_commission"] or 0) for r in rs)
+        totals = [["", "", "Totals", "", format_report_number(sum(int(r["cards_sold"] or 0) for r in rs)), format_report_money(total_sales, currency), format_report_money(total_commission, currency)]]
+        self.send_report_pdf(
+            f"card_commission_{month}", "Sales Agent Commission Report", branch, month_name(month),
+            ["Month", "Branch", "Sales Agent", "Designation", "Cards Sold", f"Card Sales ({currency})", f"Commission ({currency})"],
+            rows, widths=[0.8, 0.9, 1.4, 1.3, 0.8, 1.0, 1.0],
+            aligns=["left", "left", "left", "left", "right", "right", "right"], totals=totals,
+            summary=[("Agents", str(len(rows))), ("Cards Sold", format_report_number(sum(int(r["cards_sold"] or 0) for r in rs))),
+                     ("Card Sales", format_report_money(total_sales, currency)), ("Commission", format_report_money(total_commission, currency))],
+        )
+
+    def handle_export_budget_pdf(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "budget_read"):
+            return
+        branch, month = self.budget_context(user)
+        start, end, _, _ = self.budget_month_bounds(month)
+        params: list[Any] = [month]
+        branch_filter = ""
+        if branch != "All":
+            branch_filter = " AND bp.branch=?"; params.append(branch)
+        with db_connect() as conn:
+            rs = list(conn.execute(f"""SELECT bp.month_key,bp.branch,bp.status,ec.name category,bi.budget_amount,bi.warning_percent,bi.notes,
+                COALESCE((SELECT SUM(fe.amount) FROM finance_entries fe WHERE fe.type='Expense' AND fe.branch=bp.branch AND lower(fe.category)=lower(ec.name) AND fe.date BETWEEN ? AND ?),0) actual
+                FROM budget_plans bp JOIN budget_items bi ON bi.plan_id=bp.id JOIN expense_categories ec ON ec.id=bi.category_id
+                WHERE bp.month_key=? {branch_filter} ORDER BY bp.branch,ec.name""", [start, end, *params]))
+            currency = get_company_profile(conn)["currency_label"]
+        rows = []
+        for r in rs:
+            budget = float(r["budget_amount"] or 0)
+            actual = float(r["actual"] or 0)
+            used = actual / budget * 100 if budget else (100 if actual else 0)
+            rows.append([r["month_key"], r["branch"], r["status"], r["category"], format_report_money(budget, currency), format_report_money(actual, currency),
+                         format_report_money(budget - actual, currency), f"{used:.1f}%", f"{float(r['warning_percent'] or 0):.0f}%", r["notes"]])
+        total_budget = sum(float(r["budget_amount"] or 0) for r in rs)
+        total_actual = sum(float(r["actual"] or 0) for r in rs)
+        totals = [["", "", "", "Totals", format_report_money(total_budget, currency), format_report_money(total_actual, currency), format_report_money(total_budget - total_actual, currency), "", "", ""]]
+        self.send_report_pdf(
+            f"budget_vs_actual_{month}", "Budget Report", branch, month_name(month),
+            ["Month", "Branch", "Status", "Category", f"Budget ({currency})", f"Actual ({currency})", f"Remaining ({currency})", "Used", "Warning", "Notes"],
+            rows, widths=[0.8, 0.9, 0.8, 1.3, 1.0, 1.0, 1.0, 0.6, 0.6, 1.5],
+            aligns=["left", "left", "left", "left", "right", "right", "right", "right", "right", "left"], totals=totals,
+            summary=[("Categories", str(len(rows))), ("Budget", format_report_money(total_budget, currency)),
+                     ("Actual", format_report_money(total_actual, currency)), ("Remaining", format_report_money(total_budget - total_actual, currency))],
+        )
+
+    def payroll_report_rows(self, user: dict[str, Any]) -> tuple[str, str, list[dict[str, Any]], dict[str, Any]]:
+        branch, month = self.payroll_context(user)
+        start, end = month_date_range(month)
+        params: list[Any] = [month, start, end, start, end, start, end]
+        branch_sql = ""
+        if branch != "All":
+            branch_sql = " AND e.branch=?"
+            params.append(branch)
+        sql = f"""
+            SELECT e.id employee_id,e.name,e.role,e.branch,e.active,e.base_salary,
+                   pr.id payroll_id,pr.basic_salary payroll_basic_salary,pr.commission,
+                   pr.bonus,pr.overtime_hours,pr.overtime_amount,pr.other_allowance,
+                   pr.advance_deduction,pr.other_deductions,pr.net_salary,pr.status,
+                   pr.notes,pr.paid_at,
+                   COALESCE(att.present_days,0) present_days,
+                   COALESCE(att.absent_days,0) absent_days,
+                   COALESCE(att.leave_days,0) leave_days,
+                   COALESCE(att.half_days,0) half_days,
+                   COALESCE(att.weekly_off_days,0) weekly_off_days,
+                   COALESCE(prod.prod_ot_hours,0) production_ot_hours,
+                   COALESCE(cards.card_commission,0) card_commission_auto
+            FROM employees e
+            LEFT JOIN payroll_records pr ON pr.employee_id=e.id AND pr.month_key=?
+            LEFT JOIN (
+                SELECT employee_id,
+                  SUM(CASE WHEN status='Present' THEN 1 ELSE 0 END) present_days,
+                  SUM(CASE WHEN status='Absent' THEN 1 ELSE 0 END) absent_days,
+                  SUM(CASE WHEN status='Leave' THEN 1 ELSE 0 END) leave_days,
+                  SUM(CASE WHEN status='Half Day' THEN 1 ELSE 0 END) half_days,
+                  SUM(CASE WHEN status IN ('Weekly Off','Holiday') THEN 1 ELSE 0 END) weekly_off_days
+                FROM attendance_records WHERE date BETWEEN ? AND ? GROUP BY employee_id
+            ) att ON att.employee_id=e.id
+            LEFT JOIN (
+                SELECT employee_id,SUM(ot_hours) prod_ot_hours FROM production_entries
+                WHERE date BETWEEN ? AND ? GROUP BY employee_id
+            ) prod ON prod.employee_id=e.id
+            LEFT JOIN (
+                SELECT sales_agent_id employee_id,SUM(commission_amount) card_commission
+                FROM membership_cards WHERE issue_date BETWEEN ? AND ? AND sales_agent_id IS NOT NULL
+                GROUP BY sales_agent_id
+            ) cards ON cards.employee_id=e.id
+            WHERE (e.active=1 OR pr.id IS NOT NULL){branch_sql}
+            ORDER BY e.branch,e.name
+        """
+        with db_connect() as conn:
+            rows = [dict(r) for r in conn.execute(sql, params)]
+        summary = {"employees": len(rows), "total_basic": 0.0, "total_commission": 0.0, "total_bonus": 0.0, "total_net": 0.0, "paid": 0, "pending": 0}
+        for row in rows:
+            row["basic_salary"] = row["payroll_basic_salary"] if row["payroll_id"] else row["base_salary"]
+            if not row["payroll_id"]:
+                row["commission"] = 0
+                row["bonus"] = 0
+                row["overtime_hours"] = row["production_ot_hours"]
+                row["overtime_amount"] = 0
+                row["other_allowance"] = 0
+                row["advance_deduction"] = 0
+                row["other_deductions"] = 0
+                row["status"] = "Draft"
+                row["notes"] = ""
+                row["net_salary"] = row["basic_salary"] + row["commission"]
+            summary["total_basic"] += float(row["basic_salary"] or 0)
+            summary["total_commission"] += float(row["commission"] or 0)
+            summary["total_bonus"] += float(row["bonus"] or 0)
+            summary["total_net"] += float(row["net_salary"] or 0)
+            if row["status"] == "Paid":
+                summary["paid"] += 1
+            else:
+                summary["pending"] += 1
+        return branch, month, rows, summary
+
+    def handle_export_payroll_pdf(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "payroll_read"):
+            return
+        branch, month, rs, summary = self.payroll_report_rows(user)
+        with db_connect() as conn:
+            currency = get_company_profile(conn)["currency_label"]
+        rows = [[r["name"], r["role"], r["branch"], f"{r['present_days']} P / {r['absent_days']} A / {r['leave_days']} L / {r['half_days']} H",
+                 format_report_money(r["basic_salary"], currency), format_report_money(r["commission"], currency), format_report_money(r["bonus"], currency),
+                 format_report_money(r["overtime_amount"], currency), format_report_money(r["other_allowance"], currency),
+                 format_report_money(r["advance_deduction"], currency), format_report_money(r["other_deductions"], currency),
+                 format_report_money(r["net_salary"], currency), r["status"]] for r in rs]
+        totals = [["Totals", "", "", "", format_report_money(summary["total_basic"], currency), format_report_money(summary["total_commission"], currency),
+                   format_report_money(summary["total_bonus"], currency), "", "", "", "", format_report_money(summary["total_net"], currency), ""]]
+        self.send_report_pdf(
+            f"payroll_{month}", "Payroll Report", branch, month_name(month),
+            ["Employee", "Designation", "Branch", "Attendance", f"Basic ({currency})", f"Commission ({currency})", f"Bonus ({currency})",
+             f"OT ({currency})", f"Allowance ({currency})", f"Advance ({currency})", f"Deductions ({currency})", f"Net ({currency})", "Status"],
+            rows, widths=[1.2, 1.0, 0.8, 1.0, 0.8, 0.8, 0.7, 0.7, 0.8, 0.8, 0.8, 0.9, 0.7],
+            aligns=["left", "left", "left", "left", "right", "right", "right", "right", "right", "right", "right", "right", "left"],
+            totals=totals,
+            summary=[("Employees", str(summary["employees"])), ("Basic Salary", format_report_money(summary["total_basic"], currency)),
+                     ("Commission + Bonus", format_report_money(summary["total_commission"] + summary["total_bonus"], currency)),
+                     ("Net Payroll", format_report_money(summary["total_net"], currency))],
+        )
+
+    def handle_export_attendance_pdf(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "attendance_read"):
+            return
+        q = self.query()
+        branch = self.allowed_branch(user, q.get("branch", ["All"])[0])
+        month = q.get("month", [current_month_key()])[0]
+        start, end = month_date_range(month)
+        params: list[Any] = [start, end]
+        where = "a.date BETWEEN ? AND ?"
+        if branch != "All":
+            where += " AND a.branch=?"; params.append(branch)
+        with db_connect() as conn:
+            rs = list(conn.execute(f"""SELECT a.*,e.name,e.role FROM attendance_records a JOIN employees e ON e.id=a.employee_id
+                WHERE {where} ORDER BY a.date,e.name""", params))
+        rows = [[r["date"], r["branch"], r["name"], r["role"], r["status"], r["notes"], r["entered_by"]] for r in rs]
+        status_counts = {status: sum(1 for r in rs if r["status"] == status) for status in ATTENDANCE_STATUSES}
+        self.send_report_pdf(
+            f"attendance_{month}", "Attendance Report", branch, month_name(month),
+            ["Date", "Branch", "Employee", "Designation", "Status", "Notes", "Entered By"],
+            rows, widths=[0.9, 1.0, 1.3, 1.2, 0.9, 1.8, 1.0], aligns=["left"] * 7,
+            summary=[("Entries", str(len(rows))), ("Present", str(status_counts.get("Present", 0))),
+                     ("Absent", str(status_counts.get("Absent", 0))), ("Leave", str(status_counts.get("Leave", 0)))],
+        )
+
+    def handle_export_pos_sales_pdf(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "finance_read"):
+            return
+        where, params, filters = self.pos_sales_filters(user)
+        with db_connect() as conn:
+            rs = list(conn.execute(f"SELECT * FROM pos_sales ps {where} ORDER BY sale_datetime DESC,id DESC", params))
+            currency = get_company_profile(conn)["currency_label"]
+        rows = [[r["sale_datetime"], r["invoice_no"], r["branch"], r["customer_name"], r["payment_status"], r["payment_method"],
+                 format_report_money(r["total_amount"], currency), format_report_money(r["total_paid"], currency),
+                 format_report_money(r["sell_due"], currency), format_report_number(r["total_items"]), r["added_by"]] for r in rs]
+        total_amount = sum(float(r["total_amount"] or 0) for r in rs)
+        total_paid = sum(float(r["total_paid"] or 0) for r in rs)
+        total_due = sum(float(r["sell_due"] or 0) for r in rs)
+        totals = [["", "", "", "", "", "Totals", format_report_money(total_amount, currency), format_report_money(total_paid, currency), format_report_money(total_due, currency), format_report_number(sum(float(r["total_items"] or 0) for r in rs)), ""]]
+        self.send_report_pdf(
+            f"sales_record_{filters['start']}_to_{filters['end']}", "Sales Report", filters["branch"], date_range_label(filters["start"], filters["end"]),
+            ["Date & Time", "Invoice", "Branch", "Customer", "Status", "Method", f"Total ({currency})", f"Paid ({currency})", f"Due ({currency})", "Items", "Added By"],
+            rows, widths=[1.2, 1.0, 0.8, 1.3, 0.8, 0.9, 0.9, 0.9, 0.9, 0.6, 1.0],
+            aligns=["left", "left", "left", "left", "left", "left", "right", "right", "right", "right", "left"], totals=totals,
+            summary=[("Invoices", str(len(rows))), ("Total Sales", format_report_money(total_amount, currency)),
+                     ("Paid", format_report_money(total_paid, currency)), ("Due", format_report_money(total_due, currency))],
+        )
+
+    def handle_export_notifications_pdf(self, user: dict[str, Any]) -> None:
+        if not self.require_permission(user, "alert_read"):
+            return
+        q = self.query()
+        requested_branch = q.get("branch", ["All"])[0]
+        data = self.build_notifications(user, requested_branch)
+        rows = [[a["severity"].title(), a["type"], a["branch"], a["title"], a["message"], a["metric"], "Yes" if a["read"] else "No", a["created_label"]] for a in data["alerts"]]
+        summary = data.get("summary", {})
+        self.send_report_pdf(
+            f"management_alerts_{data['date']}", "Management Alerts Report", data["branch"], data["date"],
+            ["Severity", "Type", "Branch", "Title", "Message", "Metric", "Read", "Date"],
+            rows, widths=[0.8, 1.0, 0.9, 1.4, 2.2, 0.7, 0.6, 0.8], aligns=["left"] * 8,
+            summary=[("Alerts", str(summary.get("total", 0))), ("Unread", str(summary.get("unread", 0))),
+                     ("Critical", str(summary.get("critical", 0))), ("Warning", str(summary.get("warning", 0)))],
+        )
+
     def send_csv(self,filename:str,headers:list[str],rows:list[list[Any]])->None:
         output=io.StringIO(newline="");writer=csv.writer(output);writer.writerow(headers);writer.writerows(rows);body=output.getvalue().encode("utf-8-sig")
         self.send_response(200);self.send_header("Content-Type","text/csv; charset=utf-8");self.send_header("Content-Disposition",f'attachment; filename="{filename}"');self.send_header("Content-Length",str(len(body)));self.end_headers();self.wfile.write(body)
@@ -4499,7 +5345,8 @@ class AppHandler(BaseHTTPRequestHandler):
             ))
         can_finance = self.has_permission(user, "finance_read")
         headers = ["Order No","Booking Date","Due Date","Branch","Customer","Phone","Item","Quantity","Assigned Employee","Status"]
-        if can_finance: headers += ["Total OMR","Advance OMR","Balance OMR"]
+        currency = self.report_currency()
+        if can_finance: headers += [f"Total ({currency})",f"Advance ({currency})",f"Balance ({currency})"]
         headers += ["Notes","Entered By"]
         out = []
         for r in rows:
@@ -4507,7 +5354,7 @@ class AppHandler(BaseHTTPRequestHandler):
             if can_finance: line += [r["total_amount"],r["advance_amount"],r["total_amount"]-r["advance_amount"]]
             line += [r["notes"],r["entered_by"]]
             out.append(line)
-        self.send_csv("dar_al_sultan_orders.csv", headers, out)
+        self.send_csv(self.export_filename("orders", "csv"), headers, out)
 
     def handle_export_finance(self,user:dict[str,Any])->None:
         if not self.require_permission(user,"finance_read"):return
@@ -4516,17 +5363,18 @@ class AppHandler(BaseHTTPRequestHandler):
         if branch!="All":sql+=" AND branch=?";params.append(branch)
         sql+=" ORDER BY date,id"
         with db_connect() as conn:rs=list(conn.execute(sql,params))
-        self.send_csv("dar_al_sultan_financial_entries.csv",["ID","Date","Branch","Type","Category","Description","Amount OMR","Payment Method","Reference","Entered By"],[[r["id"],r["date"],r["branch"],r["type"],r["category"],r["description"],r["amount"],r["payment_method"],r["reference"],r["entered_by"]] for r in rs])
+        currency = self.report_currency()
+        self.send_csv(self.export_filename("financial_entries", "csv"),["ID","Date","Branch","Type","Category","Description",f"Amount ({currency})","Payment Method","Reference","Entered By"],[[r["id"],r["date"],r["branch"],r["type"],r["category"],r["description"],r["amount"],r["payment_method"],r["reference"],r["entered_by"]] for r in rs])
 
     def handle_export_production(self,user:dict[str,Any])->None:
         if not self.require_permission(user,"production_read"):return
         where,params=self.production_filters(user)
         with db_connect() as conn:rs=list(conn.execute(f"SELECT p.*,e.name employee FROM production_entries p JOIN employees e ON e.id=p.employee_id {where} ORDER BY p.date,p.id",params))
-        self.send_csv("dar_al_sultan_production_entries.csv",["ID","Date","Branch","Employee","Activity","Quantity","Ready Pcs","OT Hours","Notes","Entered By"],[[r["id"],r["date"],r["branch"],r["employee"],r["activity"],r["quantity"],r["ready_pcs"],r["ot_hours"],r["notes"],r["entered_by"]] for r in rs])
+        self.send_csv(self.export_filename("production_entries", "csv"),["ID","Date","Branch","Employee","Activity","Quantity","Ready Pcs","OT Hours","Notes","Entered By"],[[r["id"],r["date"],r["branch"],r["employee"],r["activity"],r["quantity"],r["ready_pcs"],r["ot_hours"],r["notes"],r["entered_by"]] for r in rs])
 
     def handle_backup(self,user:dict[str,Any])->None:
         if not self.require_permission(user,"backup"):return
-        stamp=datetime.now().strftime("%Y%m%d_%H%M%S");backup=BACKUP_DIR/f"dar_al_sultan_backup_{stamp}.db"
+        stamp=datetime.now().strftime("%Y%m%d_%H%M%S");backup=BACKUP_DIR/self.export_filename(f"backup_{stamp}", "db")
         with db_connect() as conn:
             conn.execute("PRAGMA wal_checkpoint(FULL)")
             log_audit(conn,user,"BACKUP","Database",backup.name,"Manual database backup")

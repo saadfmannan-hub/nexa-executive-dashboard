@@ -8,7 +8,7 @@
   <link rel="manifest" href="manifest.json" />
   <link rel="icon" type="image/png" href="favicon.png" />
   <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-  <link rel="stylesheet" href="styles.css?v=3.10-sales-template" />
+  <link rel="stylesheet" href="styles.css?v=3.11-reports-pdf" />
   <script src="i18n.js?v=3.8-branding"></script>
 </head>
 <body>
@@ -167,7 +167,7 @@
       <section class="page" id="alerts">
         <div class="section-heading">
           <div><span class="eyebrow">MANAGEMENT CONTROL CENTER</span><h3>Notifications & Daily Alerts</h3></div>
-          <div class="heading-actions"><button class="secondary-btn" id="exportAlertsBtn">Export CSV</button><button class="secondary-btn" id="markAllAlertsRead">Mark All Read</button><button class="primary-btn" id="refreshAlertsBtn">Refresh Alerts</button></div>
+          <div class="heading-actions"><button class="secondary-btn" id="exportAlertsBtn">Export CSV</button><button class="secondary-btn" id="exportAlertsPdfBtn">Download PDF</button><button class="secondary-btn" id="markAllAlertsRead">Mark All Read</button><button class="primary-btn" id="refreshAlertsBtn">Refresh Alerts</button></div>
         </div>
         <div class="filter-bar">
           <select id="alertBranch" class="control"><option value="All">All Branches</option></select>
@@ -224,7 +224,7 @@
           <article class="panel chart-card order-finance"><div class="panel-head"><div><span class="eyebrow">COLLECTION CONTROL</span><h3>Advance vs Balance</h3></div></div><div class="donut-shell"><canvas id="orderCollectionChart"></canvas></div><div class="chart-legend compact-legend" id="orderCollectionChartLegend"></div></article>
         </div>
         <article class="panel">
-          <div class="panel-head"><div><span class="eyebrow">ORDER REGISTER</span><h3>Booking to Delivery Status</h3></div><button class="secondary-btn" id="exportOrdersBtn">Export CSV</button></div>
+          <div class="panel-head"><div><span class="eyebrow">ORDER REGISTER</span><h3>Booking to Delivery Status</h3></div><div class="heading-actions"><button class="secondary-btn" id="exportOrdersBtn">Export CSV</button><button class="secondary-btn" id="exportOrdersPdfBtn">Download PDF</button></div></div>
           <div class="table-wrap"><table class="orders-table"><thead><tr><th>Order</th><th>Booking</th><th>Due</th><th>Customer</th><th>Phone</th><th>Branch</th><th>Item / Qty</th><th>Assigned To</th><th>Status</th><th class="order-finance">Total</th><th class="order-finance">Advance</th><th class="order-finance">Balance</th><th class="order-write">Actions</th></tr></thead><tbody id="ordersTableBody"></tbody></table></div>
         </article>
         <article class="panel info-panel"><h3>Production workflow</h3><p>Order status can move from New Booking → Measurement → Cutting → Body Making → Daraz/Design → Button → Ironing → Quality Check → Ready → Delivered. Overdue active orders are automatically highlighted.</p></article>
@@ -253,7 +253,7 @@
           <article class="panel"><div class="panel-head"><div><span class="eyebrow">SALES PERFORMANCE</span><h3>Agent Commission</h3></div></div><div class="chart-wrap chart-sm"><canvas id="membershipAgentChart"></canvas></div></article>
         </div>
         <article class="panel">
-          <div class="panel-head"><div><span class="eyebrow">CARD REGISTER</span><h3>Active & Historical Membership Cards</h3></div><button class="secondary-btn" id="exportMembershipBtn">Export CSV</button></div>
+          <div class="panel-head"><div><span class="eyebrow">CARD REGISTER</span><h3>Active & Historical Membership Cards</h3></div><div class="heading-actions"><button class="secondary-btn" id="exportMembershipBtn">Export CSV</button><button class="secondary-btn" id="exportMembershipPdfBtn">Download PDF</button></div></div>
           <div class="table-wrap"><table class="wide-table"><thead><tr><th>Card Number</th><th>Customer</th><th>Phone</th><th>Plan</th><th>Branch</th><th>Sales Agent</th><th>Issue</th><th>Expiry</th><th>Current Balance</th><th>Commission</th><th>Status</th><th>Actions</th></tr></thead><tbody id="membershipTableBody"></tbody></table></div>
         </article>
         <div class="dashboard-grid membership-grid">
@@ -273,6 +273,7 @@
               <input id="commissionMonth" class="control" type="month" />
               <button class="secondary-btn" id="applyCommissionFilter">Apply</button>
               <button class="secondary-btn" id="exportCommissionBtn">Export CSV</button>
+              <button class="secondary-btn" id="exportCommissionPdfBtn">Download PDF</button>
             </div>
           </div>
           <div class="kpi-grid compact-kpis" id="commissionKpis"></div>
@@ -318,7 +319,7 @@
           <div class="production-entries-footer"><span class="muted-note" id="productionEntriesScope"></span><button type="button" class="secondary-btn" id="toggleProductionEntriesBtn">Show More</button></div>
         </article>
         <article class="panel">
-          <div class="panel-head"><div><span class="eyebrow">EMPLOYEE TOTALS</span><h3>Current Production Summary</h3></div><button class="secondary-btn" id="exportProductionBtn">Export CSV</button></div>
+          <div class="panel-head"><div><span class="eyebrow">EMPLOYEE TOTALS</span><h3>Current Production Summary</h3></div><div class="heading-actions"><button class="secondary-btn" id="exportProductionBtn">Export CSV</button><button class="secondary-btn" id="exportProductionPdfBtn">Download PDF</button></div></div>
           <div class="table-wrap"><table class="wide-table"><thead><tr><th>Employee</th><th>Branch</th><th>Body</th><th>Joint/Side</th><th>Full Body</th><th>Daraz</th><th>VIP Design</th><th>Button</th><th>Alteration</th><th>Cutting</th><th>Iron</th><th>Total Activity</th><th>Total Pcs Produced</th><th>OT</th><th>History</th></tr></thead><tbody id="productionSummaryBody"></tbody></table></div>
         </article>
       </section>
@@ -341,7 +342,7 @@
           <article class="panel"><div class="panel-head"><div><span class="eyebrow">BRANCH PERFORMANCE</span><h3>Income by Branch</h3></div></div><div class="chart-wrap chart-sm"><canvas id="financeBranchChart"></canvas></div></article>
         </div>
         <article class="panel">
-          <div class="panel-head"><div><span class="eyebrow">TRANSACTION REGISTER</span><h3>Current Entries</h3></div><button class="secondary-btn" id="exportFinanceBtn">Export CSV</button></div>
+          <div class="panel-head"><div><span class="eyebrow">TRANSACTION REGISTER</span><h3>Current Entries</h3></div><div class="heading-actions"><button class="secondary-btn" id="exportFinanceBtn">Export CSV</button><button class="secondary-btn" id="exportFinancePdfBtn">Download PDF</button></div></div>
           <div class="table-wrap"><table class="wide-table"><thead><tr><th>Date</th><th>Branch</th><th>Type</th><th>Category</th><th>Description</th><th>Payment</th><th>Reference</th><th>Amount</th><th>Entered By</th><th class="finance-write">Actions</th></tr></thead><tbody id="financeTableBody"></tbody></table></div>
         </article>
       </section>
@@ -370,7 +371,7 @@
           <article class="panel"><div class="panel-head"><div><span class="eyebrow">CUSTOMER VALUE</span><h3>Top Customers</h3></div></div><div class="chart-wrap chart-sm"><canvas id="salesCustomerChart"></canvas></div></article>
         </div>
         <article class="panel">
-          <div class="panel-head"><div><span class="eyebrow">SALES REGISTER</span><h3>Invoice-Level Sales Detail</h3></div><button class="secondary-btn" id="exportPosSalesBtn">Export CSV</button></div>
+          <div class="panel-head"><div><span class="eyebrow">SALES REGISTER</span><h3>Invoice-Level Sales Detail</h3></div><div class="heading-actions"><button class="secondary-btn" id="exportPosSalesBtn">Export CSV</button><button class="secondary-btn" id="exportPosSalesPdfBtn">Download PDF</button></div></div>
           <div class="table-wrap"><table class="wide-table pos-sales-table"><thead><tr><th>Date & Time</th><th>Invoice</th><th>Customer</th><th>Phone</th><th>Branch</th><th>Payment Status</th><th>Payment Method</th><th>Total</th><th>Paid</th><th>Due</th><th>Items</th><th>Added By</th><th>Notes</th><th class="finance-write">Action</th></tr></thead><tbody id="posSalesTableBody"></tbody></table></div>
         </article>
         <article class="panel">
@@ -409,7 +410,7 @@
           <button class="secondary-btn" id="applyPayrollFilter">Apply Filter</button>
         </div>
         <article class="panel">
-          <div class="panel-head"><div><span class="eyebrow">DAILY ATTENDANCE</span><h3>Attendance Register</h3></div><button class="secondary-btn" id="exportAttendanceBtn">Export Attendance CSV</button></div>
+          <div class="panel-head"><div><span class="eyebrow">DAILY ATTENDANCE</span><h3>Attendance Register</h3></div><div class="heading-actions"><button class="secondary-btn" id="exportAttendanceBtn">Export Attendance CSV</button><button class="secondary-btn" id="exportAttendancePdfBtn">Download PDF</button></div></div>
           <div class="table-wrap"><table><thead><tr><th>Date</th><th>Employee</th><th>Branch</th><th>Status</th><th>Notes</th><th>Entered By</th><th class="attendance-write">Action</th></tr></thead><tbody id="attendanceTableBody"></tbody></table></div>
         </article>
         <div class="payroll-read">
@@ -420,7 +421,7 @@
             <article class="panel"><div class="panel-head"><div><span class="eyebrow">BRANCH PAYROLL</span><h3>Net Salary by Branch</h3></div></div><div class="chart-wrap chart-sm"><canvas id="payrollBranchChart"></canvas></div></article>
           </div>
           <article class="panel">
-            <div class="panel-head"><div><span class="eyebrow">MONTHLY SALARY REGISTER</span><h3>Editable Payroll</h3></div><button class="secondary-btn" id="exportPayrollBtn">Export Payroll CSV</button></div>
+            <div class="panel-head"><div><span class="eyebrow">MONTHLY SALARY REGISTER</span><h3>Editable Payroll</h3></div><div class="heading-actions"><button class="secondary-btn" id="exportPayrollBtn">Export Payroll CSV</button><button class="secondary-btn" id="exportPayrollPdfBtn">Download PDF</button></div></div>
             <div class="table-wrap"><table class="wide-table"><thead><tr><th>Employee</th><th>Branch</th><th>Basic Salary</th><th>Attendance</th><th>Commission</th><th>Bonus</th><th>OT Amount</th><th>Allowance</th><th>Advance</th><th>Deductions</th><th>Net Salary</th><th>Status</th><th class="payroll-write">Action</th></tr></thead><tbody id="payrollTableBody"></tbody></table></div>
           </article>
         </div>
@@ -438,6 +439,7 @@
           <button class="secondary-btn" id="applyBudgetFilter">Apply Filter</button>
           <button class="secondary-btn budget-write" id="copyBudgetBtn">Copy Previous Month</button>
           <button class="secondary-btn" id="exportBudgetBtn">Export CSV</button>
+          <button class="secondary-btn" id="exportBudgetPdfBtn">Download PDF</button>
           <span class="budget-status-pill" id="budgetStatusPill">Not Created</span>
         </div>
         <div class="kpi-grid compact-kpis" id="budgetKpis"></div>
@@ -495,15 +497,15 @@
       <section class="page" id="reports">
         <div class="section-heading"><div><span class="eyebrow">MANAGEMENT REPORTS</span><h3>Report & Backup Center</h3></div></div>
         <div class="report-grid">
-          <button class="report-card finance-report" id="reportFinance"><span>◈</span><strong>Financial Entries</strong><small>Download complete income and expense register as CSV.</small></button>
-          <button class="report-card finance-report" id="reportPosSales"><span>⇩</span><strong>Sales Record</strong><small>Download imported customer, invoice, payment and due details.</small></button>
-          <button class="report-card" id="reportProduction"><span>⚙</span><strong>Production Entries</strong><small>Download filtered daily production records as CSV.</small></button>
-          <button class="report-card" id="reportOrders"><span>◇</span><strong>Customer Orders</strong><small>Download booking, due date, status and delivery records.</small></button>
-          <button class="report-card" id="reportMembership"><span>♢</span><strong>Membership Cards</strong><small>Download card, customer, plan, expiry and wallet balances.</small></button>
-          <button class="report-card budget-read" id="reportBudget"><span>▥</span><strong>Budget vs Actual</strong><small>Download branch and category budget variance report.</small></button>
-          <button class="report-card payroll-read" id="reportPayroll"><span>▦</span><strong>Monthly Payroll</strong><small>Download saved employee salary calculations for the selected month.</small></button>
-          <button class="report-card" id="reportAttendance"><span>◉</span><strong>Attendance Register</strong><small>Download monthly attendance by branch and employee.</small></button>
-          <button class="report-card finance-report" id="reportCommissions"><span>%</span><strong>Sales Agent Commission</strong><small>Download monthly card-selling commission by sales agent.</small></button>
+          <article class="report-card finance-report"><span>◈</span><strong>Financial Entries</strong><small>Income and expense register for the selected branch and period.</small><div class="report-actions"><button class="secondary-btn" id="reportFinance">CSV</button><button class="primary-btn" id="reportFinancePdf">PDF</button></div></article>
+          <article class="report-card finance-report"><span>⇩</span><strong>Sales Record</strong><small>Imported invoice, customer, payment and due details.</small><div class="report-actions"><button class="secondary-btn" id="reportPosSales">CSV</button><button class="primary-btn" id="reportPosSalesPdf">PDF</button></div></article>
+          <article class="report-card"><span>⚙</span><strong>Production Entries</strong><small>Filtered daily workshop production and overtime records.</small><div class="report-actions"><button class="secondary-btn" id="reportProduction">CSV</button><button class="primary-btn" id="reportProductionPdf">PDF</button></div></article>
+          <article class="report-card"><span>◇</span><strong>Customer Orders</strong><small>Booking, due date, status and delivery records.</small><div class="report-actions"><button class="secondary-btn" id="reportOrders">CSV</button><button class="primary-btn" id="reportOrdersPdf">PDF</button></div></article>
+          <article class="report-card"><span>♢</span><strong>Membership Cards</strong><small>Card, customer, plan, expiry and wallet balances.</small><div class="report-actions"><button class="secondary-btn" id="reportMembership">CSV</button><button class="primary-btn" id="reportMembershipPdf">PDF</button></div></article>
+          <article class="report-card budget-read"><span>▥</span><strong>Budget vs Actual</strong><small>Branch and category budget variance report.</small><div class="report-actions"><button class="secondary-btn" id="reportBudget">CSV</button><button class="primary-btn" id="reportBudgetPdf">PDF</button></div></article>
+          <article class="report-card payroll-read"><span>▦</span><strong>Monthly Payroll</strong><small>Employee salary calculations for the selected month.</small><div class="report-actions"><button class="secondary-btn" id="reportPayroll">CSV</button><button class="primary-btn" id="reportPayrollPdf">PDF</button></div></article>
+          <article class="report-card"><span>◉</span><strong>Attendance Register</strong><small>Monthly attendance by branch and employee.</small><div class="report-actions"><button class="secondary-btn" id="reportAttendance">CSV</button><button class="primary-btn" id="reportAttendancePdf">PDF</button></div></article>
+          <article class="report-card finance-report"><span>%</span><strong>Sales Agent Commission</strong><small>Monthly card-selling commission by sales agent.</small><div class="report-actions"><button class="secondary-btn" id="reportCommissions">CSV</button><button class="primary-btn" id="reportCommissionsPdf">PDF</button></div></article>
           <button class="report-card backup-only" id="backupDatabase"><span>▣</span><strong>Database Backup</strong><small>Download a full SQLite database safety copy.</small></button>
           <button class="report-card" id="printDashboard"><span>▤</span><strong>Print Dashboard</strong><small>Print or save the current dashboard as PDF.</small></button>
         </div>
@@ -938,7 +940,7 @@
 
   <div class="confirm-modal" id="confirmModal"><div class="confirm-card"><h3 id="confirmTitle">Confirm action</h3><p id="confirmMessage"></p><div><button class="secondary-btn" id="confirmCancel">Cancel</button><button class="danger-btn" id="confirmOk">Delete</button></div></div></div>
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=3.10-sales-template"></script>
+  <script src="app.js?v=3.11-reports-pdf"></script>
   <script>if ('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('/service-worker.js').catch(()=>{}));</script>
 </body>
 </html>
