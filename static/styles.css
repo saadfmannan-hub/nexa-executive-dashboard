@@ -235,9 +235,10 @@ select option[selected]{background:#1d2940;color:#fff}
 select option:hover,
 select option:focus{background:#243450;color:#fff}
 
-input[type="date"],input[type="month"]{color-scheme:dark}
+input[type="date"],input[type="month"],input[type="datetime-local"]{color-scheme:dark}
 input[type="date"]::-webkit-calendar-picker-indicator,
-input[type="month"]::-webkit-calendar-picker-indicator{
+input[type="month"]::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]::-webkit-calendar-picker-indicator{
   cursor:pointer;
   opacity:1;
   border-radius:7px;
@@ -246,7 +247,8 @@ input[type="month"]::-webkit-calendar-picker-indicator{
   filter:invert(89%) sepia(27%) saturate(561%) hue-rotate(351deg) brightness(103%) contrast(93%);
 }
 input[type="date"]:hover::-webkit-calendar-picker-indicator,
-input[type="month"]:hover::-webkit-calendar-picker-indicator{background-color:rgba(213,179,107,.22)}
+input[type="month"]:hover::-webkit-calendar-picker-indicator,
+input[type="datetime-local"]:hover::-webkit-calendar-picker-indicator{background-color:rgba(213,179,107,.22)}
 
 /* ===== Settings module: tabs, company profile, owner settings ===== */
 .settings-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;border-bottom:1px solid var(--border);padding-bottom:2px}
